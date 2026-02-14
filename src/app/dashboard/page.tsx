@@ -114,16 +114,35 @@ export default function Dashboard() {
 
               <div>
                 <label className="text-sm text-gray-400 block mb-2">Step 2: Run this on your agent's machine</label>
-                <div className="flex gap-2">
-                  <code className="flex-1 bg-gray-800 px-3 py-2 rounded text-sm font-mono text-green-400">
-                    curl -sL https://openclaw-viewer.vercel.app/connect.js | node
-                  </code>
-                  <button
-                    onClick={() => copyToClipboard('curl -sL https://openclaw-viewer.vercel.app/connect.js | node', 'cmd')}
-                    className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded text-sm shrink-0"
-                  >
-                    {copied === 'cmd' ? '✓ Copied' : 'Copy'}
-                  </button>
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-xs text-gray-500">Mac/Linux:</span>
+                    <div className="flex gap-2 mt-1">
+                      <code className="flex-1 bg-gray-800 px-3 py-2 rounded text-sm font-mono text-green-400">
+                        curl -sL https://openclaw-viewer.vercel.app/connect.js | node
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard('curl -sL https://openclaw-viewer.vercel.app/connect.js | node', 'mac')}
+                        className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm shrink-0"
+                      >
+                        {copied === 'mac' ? '✓' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500">Windows (PowerShell):</span>
+                    <div className="flex gap-2 mt-1">
+                      <code className="flex-1 bg-gray-800 px-3 py-2 rounded text-sm font-mono text-green-400 overflow-x-auto">
+                        irm https://openclaw-viewer.vercel.app/connect.js | node
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard('irm https://openclaw-viewer.vercel.app/connect.js | node', 'win')}
+                        className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm shrink-0"
+                      >
+                        {copied === 'win' ? '✓' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -148,9 +148,20 @@ export default function AgentPage() {
               <p className="text-sm text-gray-400 mb-3">
                 Run this on your agent's machine to connect:
               </p>
-              <code className="block bg-gray-800 px-3 py-2 rounded text-sm text-green-400">
-                curl -sL https://openclaw-viewer.vercel.app/connect.js | node
-              </code>
+              <div className="space-y-2">
+                <div>
+                  <span className="text-xs text-gray-500">Mac/Linux:</span>
+                  <code className="block bg-gray-800 px-3 py-2 rounded text-sm text-green-400 mt-1">
+                    curl -sL https://openclaw-viewer.vercel.app/connect.js | node
+                  </code>
+                </div>
+                <div>
+                  <span className="text-xs text-gray-500">Windows (PowerShell):</span>
+                  <code className="block bg-gray-800 px-3 py-2 rounded text-sm text-green-400 mt-1">
+                    irm https://openclaw-viewer.vercel.app/connect.js | node
+                  </code>
+                </div>
+              </div>
               <p className="text-xs text-gray-500 mt-2">
                 It will ask for your API key and set up automatic syncing.
               </p>
