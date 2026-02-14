@@ -119,10 +119,10 @@ export default function Dashboard() {
                     <span className="text-xs text-gray-500">Mac/Linux:</span>
                     <div className="flex gap-2 mt-1">
                       <code className="flex-1 bg-gray-800 px-3 py-2 rounded text-sm font-mono text-green-400">
-                        curl -sL https://openclaw-viewer.vercel.app/connect.js | node
+                        curl -sL https://openclaw-viewer.vercel.app/api/connect | node
                       </code>
                       <button
-                        onClick={() => copyToClipboard('curl -sL https://openclaw-viewer.vercel.app/connect.js | node', 'mac')}
+                        onClick={() => copyToClipboard('curl -sL https://openclaw-viewer.vercel.app/api/connect | node', 'mac')}
                         className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm shrink-0"
                       >
                         {copied === 'mac' ? '✓' : 'Copy'}
@@ -133,10 +133,10 @@ export default function Dashboard() {
                     <span className="text-xs text-gray-500">Windows (PowerShell):</span>
                     <div className="flex gap-2 mt-1">
                       <code className="flex-1 bg-gray-800 px-3 py-2 rounded text-sm font-mono text-green-400 overflow-x-auto">
-                        irm https://openclaw-viewer.vercel.app/connect.js | node
+                        irm https://openclaw-viewer.vercel.app/api/connect | node
                       </code>
                       <button
-                        onClick={() => copyToClipboard('irm https://openclaw-viewer.vercel.app/connect.js | node', 'win')}
+                        onClick={() => copyToClipboard('irm https://openclaw-viewer.vercel.app/api/connect | node', 'win')}
                         className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm shrink-0"
                       >
                         {copied === 'win' ? '✓' : 'Copy'}

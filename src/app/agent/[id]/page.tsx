@@ -152,13 +152,13 @@ export default function AgentPage() {
                 <div>
                   <span className="text-xs text-gray-500">Mac/Linux:</span>
                   <code className="block bg-gray-800 px-3 py-2 rounded text-sm text-green-400 mt-1">
-                    curl -sL https://openclaw-viewer.vercel.app/connect.js | node
+                    curl -sL https://openclaw-viewer.vercel.app/api/connect | node
                   </code>
                 </div>
                 <div>
                   <span className="text-xs text-gray-500">Windows (PowerShell):</span>
                   <code className="block bg-gray-800 px-3 py-2 rounded text-sm text-green-400 mt-1">
-                    irm https://openclaw-viewer.vercel.app/connect.js | node
+                    irm https://openclaw-viewer.vercel.app/api/connect | node
                   </code>
                 </div>
               </div>
