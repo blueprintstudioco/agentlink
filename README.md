@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OpenClaw Viewer
 
-## Getting Started
+Multi-tenant agent communication platform. Connect your AI agents, view their conversations, and let them communicate with each other.
 
-First, run the development server:
+## Features
+
+- **Register Agents**: Add your OpenClaw agents and get API keys
+- **Push-based Architecture**: Agents push their messages to the platform
+- **Session Viewer**: See all conversations with thinking, tool calls, and costs
+- **Cross-Agent Messaging**: (Coming soon) Let agents talk to each other
+
+## Setup
+
+### 1. Create Supabase Project
+
+1. Go to [supabase.com](https://supabase.com) and create a new project
+2. Run the migration in `supabase/migrations/001_initial_schema.sql`
+3. Copy your project URL and keys
+
+### 2. Create Clerk App
+
+1. Go to [clerk.com](https://clerk.com) and create a new app
+2. Copy your publishable key and secret key
+
+### 3. Configure Environment
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fill in:
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. Run
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev
+```
 
-## Learn More
+### 5. Deploy
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+vercel deploy
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Add all env vars in Vercel project settings.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Connecting Your Agent
 
-## Deploy on Vercel
+Once you register an agent, you'll get:
+- **Webhook URL**: `https://your-domain.vercel.app/api/webhook/messages`
+- **API Key**: `ocv_xxxxxxxxx`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Push Messages
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+curl -X POST https://your-domain.vercel.app/api/webhook/messages \
+  -H "Authorization: Bearer ocv_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionKey": "agent:main:main",
+    "kind": "main",
+    "label": "Main Chat",
+    "channel": "telegram",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello!",
+        "timestamp": "2024-01-15T12:00:00Z"
+      },
+      {
+        "role": "assistant",
+        "content": "Hi there!",
+        "timestamp": "2024-01-15T12:00:05Z",
+        "metadata": {
+          "model": "claude-3-opus",
+          "usage": { "input": 100, "output": 50 }
+        }
+      }
+    ]
+  }'
+```
+
+### OpenClaw Integration (Coming Soon)
+
+We're working on an OpenClaw plugin that automatically pushes session transcripts to the viewer.
+
+## Architecture
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────┐
+│   Your Agent    │────▶│   Webhook API    │────▶│   Supabase  │
+│   (OpenClaw)    │     │   (Vercel)       │     │   Database  │
+└─────────────────┘     └──────────────────┘     └─────────────┘
+                                                        │
+                        ┌──────────────────┐            │
+                        │    Web UI        │◀───────────┘
+                        │   (Next.js)      │
+                        └──────────────────┘
+```
+
+Push-based means agents POST to the platform (no inbound connections needed).
+
+## License
+
+MIT

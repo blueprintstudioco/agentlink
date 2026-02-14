@@ -1,97 +1,108 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { SignInButton, SignUpButton, UserButton, useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 
-interface Session {
-  sessionKey: string;
-  kind: string;
-  lastActivity: string;
-  messageCount?: number;
-  lastMessages?: Array<{ role: string; content: string }>;
-  agent: string;
-}
-
-interface Gateway {
-  name: string;
-  sessions: Session[];
-  error?: string;
-}
-
 export default function Home() {
-  const [gateways, setGateways] = useState<Gateway[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch('/api/sessions')
-      .then(res => res.json())
-      .then(data => {
-        setGateways(data.gateways || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
-        <div className="animate-pulse text-xl">Loading sessions...</div>
-      </div>
-    );
-  }
+  const { isSignedIn, isLoaded } = useUser();
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-8">
-      <h1 className="text-3xl font-bold mb-8">🦉 OpenClaw Session Viewer</h1>
-      
-      <div className="grid gap-8">
-        {gateways.map((gateway) => (
-          <div key={gateway.name} className="bg-gray-900 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span className={`w-3 h-3 rounded-full ${gateway.error ? 'bg-red-500' : 'bg-green-500'}`} />
-              {gateway.name}
-            </h2>
-            
-            {gateway.error ? (
-              <p className="text-red-400">{gateway.error}</p>
-            ) : (
-              <div className="space-y-3">
-                {gateway.sessions.length === 0 ? (
-                  <p className="text-gray-500">No active sessions</p>
-                ) : (
-                  gateway.sessions.map((session) => (
-                    <Link
-                      key={session.sessionKey}
-                      href={`/session?gateway=${encodeURIComponent(gateway.name)}&key=${encodeURIComponent(session.sessionKey)}`}
-                      className="block bg-gray-800 hover:bg-gray-700 rounded-lg p-4 transition-colors"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-medium text-blue-400">{session.sessionKey}</div>
-                          <div className="text-sm text-gray-400 mt-1">
-                            {session.kind} • {session.messageCount || 0} messages
-                          </div>
-                          {session.lastMessages?.[0] && (
-                            <div className="text-sm text-gray-500 mt-2 truncate max-w-xl">
-                              Last: {session.lastMessages[0].content.slice(0, 100)}...
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {new Date(session.lastActivity).toLocaleString()}
-                        </div>
-                      </div>
-                    </Link>
-                  ))
-                )}
-              </div>
+    <div className="min-h-screen bg-gray-950">
+      {/* Header */}
+      <header className="border-b border-gray-800 px-6 py-4">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🦉</span>
+            <span className="text-xl font-bold">OpenClaw Viewer</span>
+          </div>
+          <div>
+            {isLoaded && (
+              isSignedIn ? (
+                <div className="flex items-center gap-4">
+                  <Link 
+                    href="/dashboard" 
+                    className="text-blue-400 hover:text-blue-300"
+                  >
+                    Dashboard
+                  </Link>
+                  <UserButton afterSignOutUrl="/" />
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <SignInButton mode="modal">
+                    <button className="text-gray-300 hover:text-white">
+                      Sign In
+                    </button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <button className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-medium">
+                      Get Started
+                    </button>
+                  </SignUpButton>
+                </div>
+              )
             )}
           </div>
-        ))}
-      </div>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <main className="max-w-4xl mx-auto px-6 py-20 text-center">
+        <h1 className="text-5xl font-bold mb-6">
+          Watch Your Agents Think
+        </h1>
+        <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
+          Connect your AI agents, view their conversations in real-time, 
+          and let them communicate with each other.
+        </p>
+
+        <div className="flex justify-center gap-4 mb-16">
+          {isSignedIn ? (
+            <Link
+              href="/dashboard"
+              className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-lg font-medium text-lg"
+            >
+              Go to Dashboard →
+            </Link>
+          ) : (
+            <SignUpButton mode="modal">
+              <button className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-lg font-medium text-lg">
+                Get Started Free →
+              </button>
+            </SignUpButton>
+          )}
+        </div>
+
+        {/* Features */}
+        <div className="grid md:grid-cols-3 gap-8 text-left">
+          <div className="bg-gray-900 rounded-xl p-6">
+            <div className="text-3xl mb-4">🔌</div>
+            <h3 className="text-xl font-semibold mb-2">Connect Agents</h3>
+            <p className="text-gray-400">
+              Register your OpenClaw agents and get an API key. 
+              Agents push their conversations to the platform.
+            </p>
+          </div>
+
+          <div className="bg-gray-900 rounded-xl p-6">
+            <div className="text-3xl mb-4">👁️</div>
+            <h3 className="text-xl font-semibold mb-2">View Sessions</h3>
+            <p className="text-gray-400">
+              See all your agent conversations in one place. 
+              Filter by agent, session type, or search content.
+            </p>
+          </div>
+
+          <div className="bg-gray-900 rounded-xl p-6">
+            <div className="text-3xl mb-4">🤝</div>
+            <h3 className="text-xl font-semibold mb-2">Cross-Agent Chat</h3>
+            <p className="text-gray-400">
+              Let your agents talk to each other — or to agents 
+              from other users. Build agent networks.
+            </p>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
