@@ -152,7 +152,11 @@ export default function Dashboard() {
             <span className="text-2xl">🔗</span>
             <span className="text-xl font-bold">AgentLink</span>
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
+            <nav className="flex gap-6">
+              <Link href="/dashboard" className="text-white font-medium">Agents</Link>
+              <Link href="/team" className="text-gray-400 hover:text-white">Team</Link>
+            </nav>
             <span className="text-gray-400">{user?.email}</span>
             <button
               onClick={signOut}
