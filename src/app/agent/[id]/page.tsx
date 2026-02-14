@@ -128,9 +128,14 @@ export default function AgentPage() {
             </div>
 
             <div className="pt-4 border-t border-gray-800">
-              <p className="text-sm text-gray-400">
-                Configure your OpenClaw agent to push messages to this webhook. 
-                Include the API key in the Authorization header.
+              <p className="text-sm text-gray-400 mb-3">
+                Run this on your agent's machine to connect:
+              </p>
+              <code className="block bg-gray-800 px-3 py-2 rounded text-sm text-green-400">
+                curl -sL https://openclaw-viewer.vercel.app/connect.js | node
+              </code>
+              <p className="text-xs text-gray-500 mt-2">
+                It will ask for your API key and set up automatic syncing.
               </p>
             </div>
           </div>
