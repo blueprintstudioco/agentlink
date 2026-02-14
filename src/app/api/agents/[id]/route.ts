@@ -16,7 +16,7 @@ export async function GET(
 
   // Get user
   const { data: user } = await supabaseAdmin
-    .from('users')
+    .from('ocv_users')
     .select('id')
     .eq('clerk_id', userId)
     .single();
@@ -27,7 +27,7 @@ export async function GET(
 
   // Get agent (verify ownership)
   const { data: agent, error: agentError } = await supabaseAdmin
-    .from('agents')
+    .from('ocv_agents')
     .select('*')
     .eq('id', agentId)
     .eq('user_id', user.id)
@@ -39,10 +39,10 @@ export async function GET(
 
   // Get sessions with message counts
   const { data: sessions } = await supabaseAdmin
-    .from('sessions')
+    .from('ocv_sessions')
     .select(`
       *,
-      messages:messages(count)
+      messages:ocv_messages(count)
     `)
     .eq('agent_id', agentId)
     .order('updated_at', { ascending: false });
@@ -51,7 +51,7 @@ export async function GET(
   const sessionsWithLastMessage = await Promise.all(
     (sessions || []).map(async (session) => {
       const { data: lastMessage } = await supabaseAdmin
-        .from('messages')
+        .from('ocv_messages')
         .select('content, role')
         .eq('session_id', session.id)
         .order('timestamp', { ascending: false })
@@ -88,7 +88,7 @@ export async function DELETE(
 
   // Get user
   const { data: user } = await supabaseAdmin
-    .from('users')
+    .from('ocv_users')
     .select('id')
     .eq('clerk_id', userId)
     .single();
@@ -99,7 +99,7 @@ export async function DELETE(
 
   // Delete agent (cascade will delete sessions and messages)
   const { error } = await supabaseAdmin
-    .from('agents')
+    .from('ocv_agents')
     .delete()
     .eq('id', agentId)
     .eq('user_id', user.id);

@@ -8,7 +8,7 @@ async function ensureUser(clerkId: string) {
   const clerkUser = await currentUser();
   
   const { data: existingUser } = await supabaseAdmin
-    .from('users')
+    .from('ocv_users')
     .select()
     .eq('clerk_id', clerkId)
     .single();
@@ -16,7 +16,7 @@ async function ensureUser(clerkId: string) {
   if (existingUser) return existingUser;
 
   const { data: newUser, error } = await supabaseAdmin
-    .from('users')
+    .from('ocv_users')
     .insert({
       clerk_id: clerkId,
       email: clerkUser?.primaryEmailAddress?.emailAddress,
@@ -40,10 +40,10 @@ export async function GET() {
   const user = await ensureUser(userId);
 
   const { data: agents, error } = await supabaseAdmin
-    .from('agents')
+    .from('ocv_agents')
     .select(`
       *,
-      sessions:sessions(count)
+      sessions:ocv_sessions(count)
     `)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
@@ -57,7 +57,7 @@ export async function GET() {
   const agentsWithStats = await Promise.all(
     (agents || []).map(async (agent) => {
       const { data: lastSession } = await supabaseAdmin
-        .from('sessions')
+        .from('ocv_sessions')
         .select('updated_at')
         .eq('agent_id', agent.id)
         .order('updated_at', { ascending: false })
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
   const apiKey = `ocv_${nanoid(32)}`;
 
   const { data: agent, error } = await supabaseAdmin
-    .from('agents')
+    .from('ocv_agents')
     .insert({
       user_id: user.id,
       name: name.trim(),

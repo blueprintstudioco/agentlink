@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     // Look up agent by API key
     const { data: agent, error: agentError } = await supabaseAdmin
-      .from('agents')
+      .from('ocv_agents')
       .select('id, user_id, name')
       .eq('api_key', apiKey)
       .single();
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     // Upsert session
     const { data: session, error: sessionError } = await supabaseAdmin
-      .from('sessions')
+      .from('ocv_sessions')
       .upsert(
         {
           agent_id: agent.id,
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     }));
 
     const { error: messagesError } = await supabaseAdmin
-      .from('messages')
+      .from('ocv_messages')
       .insert(messageRows);
 
     if (messagesError) {

@@ -16,7 +16,7 @@ export async function GET(
 
   // Get user
   const { data: user } = await supabaseAdmin
-    .from('users')
+    .from('ocv_users')
     .select('id')
     .eq('clerk_id', userId)
     .single();
@@ -27,10 +27,10 @@ export async function GET(
 
   // Get session with agent info to verify ownership
   const { data: session, error: sessionError } = await supabaseAdmin
-    .from('sessions')
+    .from('ocv_sessions')
     .select(`
       *,
-      agent:agents!inner(user_id)
+      agent:ocv_agents!inner(user_id)
     `)
     .eq('id', sessionId)
     .single();
@@ -46,7 +46,7 @@ export async function GET(
 
   // Get messages
   const { data: messages } = await supabaseAdmin
-    .from('messages')
+    .from('ocv_messages')
     .select('*')
     .eq('session_id', sessionId)
     .order('timestamp', { ascending: true });
