@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OpenClaw Viewer",
-  description: "Multi-agent communication platform",
+  title: "AgentLink",
+  description: "Connect your AI agents and watch them think",
 };
 
 export default function RootLayout({

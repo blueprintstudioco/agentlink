@@ -24,6 +24,8 @@ export default function Dashboard() {
   const [showNewAgent, setShowNewAgent] = useState(false);
   const [newAgentName, setNewAgentName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [newlyCreatedAgent, setNewlyCreatedAgent] = useState<Agent | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
   const supabase = createSupabaseBrowserClient();
   const router = useRouter();
 
@@ -57,8 +59,10 @@ export default function Dashboard() {
         body: JSON.stringify({ name: newAgentName }),
       });
       if (res.ok) {
+        const data = await res.json();
         setNewAgentName('');
         setShowNewAgent(false);
+        setNewlyCreatedAgent(data.agent);
         fetchAgents();
       }
     } catch (error) {
@@ -66,6 +70,12 @@ export default function Dashboard() {
     } finally {
       setCreating(false);
     }
+  }
+
+  function copyToClipboard(text: string, label: string) {
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(null), 2000);
   }
 
   async function signOut() {
@@ -76,12 +86,71 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-950">
+      {/* Setup Modal */}
+      {newlyCreatedAgent && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-xl max-w-lg w-full p-6">
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-2">🎉</div>
+              <h2 className="text-2xl font-bold">{newlyCreatedAgent.name} Created!</h2>
+              <p className="text-gray-400 mt-1">Now let's connect your agent</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-400 block mb-2">Step 1: Copy your API key</label>
+                <div className="flex gap-2">
+                  <code className="flex-1 bg-gray-800 px-3 py-2 rounded text-sm font-mono truncate">
+                    {newlyCreatedAgent.api_key}
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(newlyCreatedAgent.api_key, 'key')}
+                    className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-sm shrink-0"
+                  >
+                    {copied === 'key' ? '✓ Copied' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400 block mb-2">Step 2: Run this on your agent's machine</label>
+                <div className="flex gap-2">
+                  <code className="flex-1 bg-gray-800 px-3 py-2 rounded text-sm font-mono text-green-400">
+                    curl -sL https://openclaw-viewer.vercel.app/connect.js | node
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard('curl -sL https://openclaw-viewer.vercel.app/connect.js | node', 'cmd')}
+                    className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded text-sm shrink-0"
+                  >
+                    {copied === 'cmd' ? '✓ Copied' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400 block mb-2">Step 3: Paste the API key when prompted</label>
+                <p className="text-sm text-gray-500">
+                  The script will set up automatic syncing. Your agent's conversations will appear here.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setNewlyCreatedAgent(null)}
+              className="w-full mt-6 bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-medium"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b border-gray-800 px-6 py-4">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl">🦉</span>
-            <span className="text-xl font-bold">OpenClaw Viewer</span>
+            <span className="text-2xl">🔗</span>
+            <span className="text-xl font-bold">AgentLink</span>
           </Link>
           <div className="flex items-center gap-4">
             <span className="text-gray-400">{user?.email}</span>
@@ -115,9 +184,10 @@ export default function Dashboard() {
                 type="text"
                 value={newAgentName}
                 onChange={(e) => setNewAgentName(e.target.value)}
-                placeholder="Agent name (e.g., Bubo)"
+                placeholder="Agent name (e.g., Bubo, Pip)"
                 className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
                 onKeyDown={(e) => e.key === 'Enter' && createAgent()}
+                autoFocus
               />
               <button
                 onClick={createAgent}
@@ -144,7 +214,7 @@ export default function Dashboard() {
             <div className="text-4xl mb-4">🤖</div>
             <h2 className="text-xl font-semibold mb-2">No agents yet</h2>
             <p className="text-gray-400 mb-6">
-              Register an agent to start viewing its conversations.
+              Add your first agent to start viewing its conversations.
             </p>
             <button
               onClick={() => setShowNewAgent(true)}
@@ -176,7 +246,7 @@ export default function Dashboard() {
                   </div>
                   <div className="text-right">
                     <code className="text-xs bg-gray-800 px-2 py-1 rounded text-gray-400">
-                      {agent.api_key.slice(0, 8)}...
+                      {agent.api_key.slice(0, 12)}...
                     </code>
                   </div>
                 </div>

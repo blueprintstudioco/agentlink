@@ -23,8 +23,8 @@ export default function Home() {
       <header className="border-b border-gray-800 px-6 py-4">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🦉</span>
-            <span className="text-xl font-bold">OpenClaw Viewer</span>
+            <span className="text-2xl">🔗</span>
+            <span className="text-xl font-bold">AgentLink</span>
           </div>
           <div>
             {!loading && (
@@ -51,7 +51,7 @@ export default function Home() {
       {/* Hero */}
       <main className="max-w-4xl mx-auto px-6 py-20 text-center">
         <h1 className="text-5xl font-bold mb-6">
-          Watch Your Agents Think
+          Connect Your AI Agents
         </h1>
         <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
           Connect your AI agents, view their conversations in real-time, 
