@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 interface Agent {
@@ -25,6 +25,7 @@ interface Session {
 
 export default function AgentPage() {
   const params = useParams();
+  const router = useRouter();
   const agentId = params.id as string;
 
   const [agent, setAgent] = useState<Agent | null>(null);
@@ -32,6 +33,8 @@ export default function AgentPage() {
   const [loading, setLoading] = useState(true);
   const [showApiKey, setShowApiKey] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchAgent();
@@ -55,6 +58,20 @@ export default function AgentPage() {
       navigator.clipboard.writeText(agent.api_key);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  async function deleteAgent() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/agents/${agentId}`, { method: 'DELETE' });
+      if (res.ok) {
+        router.push('/dashboard');
+      }
+    } catch (error) {
+      console.error('Failed to delete agent:', error);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -138,8 +155,44 @@ export default function AgentPage() {
                 It will ask for your API key and set up automatic syncing.
               </p>
             </div>
+
+            <div className="pt-4 border-t border-gray-800">
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="text-red-400 hover:text-red-300 text-sm"
+              >
+                Delete this agent
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-900 rounded-xl max-w-md w-full p-6">
+              <h2 className="text-xl font-bold mb-2">Delete {agent.name}?</h2>
+              <p className="text-gray-400 mb-6">
+                This will permanently delete this agent and all its session data. This cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={deleteAgent}
+                  disabled={deleting}
+                  className="flex-1 bg-red-600 hover:bg-red-500 py-2 rounded-lg disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Sessions */}
         <h2 className="text-2xl font-bold mb-4">Sessions</h2>
