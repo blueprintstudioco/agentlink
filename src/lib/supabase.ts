@@ -1,11 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-// Client-side Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Browser client for client components
+export function createSupabaseBrowserClient() {
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+}
 
 // Server-side Supabase client with service role (bypasses RLS)
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
@@ -13,7 +16,6 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 // Types
 export interface User {
   id: string;
-  clerk_id: string;
   email: string | null;
   name: string | null;
   avatar_url: string | null;

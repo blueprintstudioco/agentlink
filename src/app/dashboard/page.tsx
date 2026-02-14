@@ -1,8 +1,10 @@
 'use client';
 
-import { useUser } from '@clerk/nextjs';
 import { useEffect, useState } from 'react';
+import { createSupabaseBrowserClient } from '@/lib/supabase';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import type { User } from '@supabase/supabase-js';
 
 interface Agent {
   id: string;
@@ -16,16 +18,22 @@ interface Agent {
 }
 
 export default function Dashboard() {
-  const { user } = useUser();
+  const [user, setUser] = useState<User | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewAgent, setShowNewAgent] = useState(false);
   const [newAgentName, setNewAgentName] = useState('');
   const [creating, setCreating] = useState(false);
+  const supabase = createSupabaseBrowserClient();
+  const router = useRouter();
 
   useEffect(() => {
-    fetchAgents();
-  }, []);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      if (user) fetchAgents();
+      else setLoading(false);
+    });
+  }, [supabase.auth]);
 
   async function fetchAgents() {
     try {
@@ -60,6 +68,12 @@ export default function Dashboard() {
     }
   }
 
+  async function signOut() {
+    await supabase.auth.signOut();
+    router.push('/');
+    router.refresh();
+  }
+
   return (
     <div className="min-h-screen bg-gray-950">
       {/* Header */}
@@ -70,7 +84,13 @@ export default function Dashboard() {
             <span className="text-xl font-bold">OpenClaw Viewer</span>
           </Link>
           <div className="flex items-center gap-4">
-            <span className="text-gray-400">{user?.primaryEmailAddress?.emailAddress}</span>
+            <span className="text-gray-400">{user?.email}</span>
+            <button
+              onClick={signOut}
+              className="text-gray-400 hover:text-white text-sm"
+            >
+              Sign out
+            </button>
           </div>
         </div>
       </header>

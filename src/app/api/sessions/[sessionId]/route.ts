@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { getUser } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase';
 
 // GET /api/sessions/[sessionId] - Get session with messages
@@ -7,23 +7,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) {
+  const authUser = await getUser();
+  if (!authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { sessionId } = await params;
-
-  // Get user
-  const { data: user } = await supabaseAdmin
-    .from('ocv_users')
-    .select('id')
-    .eq('clerk_id', userId)
-    .single();
-
-  if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
-  }
 
   // Get session with agent info to verify ownership
   const { data: session, error: sessionError } = await supabaseAdmin
@@ -40,7 +29,7 @@ export async function GET(
   }
 
   // Verify ownership
-  if (session.agent.user_id !== user.id) {
+  if (session.agent.user_id !== authUser.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 

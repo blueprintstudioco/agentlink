@@ -1,10 +1,21 @@
 'use client';
 
-import { SignInButton, SignUpButton, UserButton, useUser } from '@clerk/nextjs';
+import { useEffect, useState } from 'react';
+import { createSupabaseBrowserClient } from '@/lib/supabase';
 import Link from 'next/link';
+import type { User } from '@supabase/supabase-js';
 
 export default function Home() {
-  const { isSignedIn, isLoaded } = useUser();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const supabase = createSupabaseBrowserClient();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      setLoading(false);
+    });
+  }, [supabase.auth]);
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -16,30 +27,21 @@ export default function Home() {
             <span className="text-xl font-bold">OpenClaw Viewer</span>
           </div>
           <div>
-            {isLoaded && (
-              isSignedIn ? (
-                <div className="flex items-center gap-4">
-                  <Link 
-                    href="/dashboard" 
-                    className="text-blue-400 hover:text-blue-300"
-                  >
-                    Dashboard
-                  </Link>
-                  <UserButton afterSignOutUrl="/" />
-                </div>
+            {!loading && (
+              user ? (
+                <Link 
+                  href="/dashboard" 
+                  className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-medium"
+                >
+                  Dashboard →
+                </Link>
               ) : (
-                <div className="flex items-center gap-3">
-                  <SignInButton mode="modal">
-                    <button className="text-gray-300 hover:text-white">
-                      Sign In
-                    </button>
-                  </SignInButton>
-                  <SignUpButton mode="modal">
-                    <button className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-medium">
-                      Get Started
-                    </button>
-                  </SignUpButton>
-                </div>
+                <Link
+                  href="/auth"
+                  className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-medium"
+                >
+                  Get Started
+                </Link>
               )
             )}
           </div>
@@ -57,20 +59,12 @@ export default function Home() {
         </p>
 
         <div className="flex justify-center gap-4 mb-16">
-          {isSignedIn ? (
-            <Link
-              href="/dashboard"
-              className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-lg font-medium text-lg"
-            >
-              Go to Dashboard →
-            </Link>
-          ) : (
-            <SignUpButton mode="modal">
-              <button className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-lg font-medium text-lg">
-                Get Started Free →
-              </button>
-            </SignUpButton>
-          )}
+          <Link
+            href={user ? "/dashboard" : "/auth"}
+            className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-lg font-medium text-lg"
+          >
+            {user ? "Go to Dashboard →" : "Get Started Free →"}
+          </Link>
         </div>
 
         {/* Features */}

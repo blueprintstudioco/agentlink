@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { createSupabaseServerClient, getUser } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { nanoid } from 'nanoid';
 
 // Ensure user exists in our DB
-async function ensureUser(clerkId: string) {
-  const clerkUser = await currentUser();
-  
+async function ensureUser(authUser: { id: string; email?: string }) {
   const { data: existingUser } = await supabaseAdmin
     .from('ocv_users')
     .select()
-    .eq('clerk_id', clerkId)
+    .eq('id', authUser.id)
     .single();
 
   if (existingUser) return existingUser;
@@ -18,10 +16,8 @@ async function ensureUser(clerkId: string) {
   const { data: newUser, error } = await supabaseAdmin
     .from('ocv_users')
     .insert({
-      clerk_id: clerkId,
-      email: clerkUser?.primaryEmailAddress?.emailAddress,
-      name: clerkUser?.fullName || clerkUser?.firstName,
-      avatar_url: clerkUser?.imageUrl,
+      id: authUser.id,
+      email: authUser.email,
     })
     .select()
     .single();
@@ -32,12 +28,12 @@ async function ensureUser(clerkId: string) {
 
 // GET /api/agents - List user's agents
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) {
+  const authUser = await getUser();
+  if (!authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const user = await ensureUser(userId);
+  const user = await ensureUser(authUser);
 
   const { data: agents, error } = await supabaseAdmin
     .from('ocv_agents')
@@ -77,12 +73,12 @@ export async function GET() {
 
 // POST /api/agents - Create new agent
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
+  const authUser = await getUser();
+  if (!authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const user = await ensureUser(userId);
+  const user = await ensureUser(authUser);
   const body = await request.json();
   const { name, description } = body;
 

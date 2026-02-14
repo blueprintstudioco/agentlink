@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { getUser } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase';
 
 // GET /api/agents/[id] - Get agent details and sessions
@@ -7,30 +7,19 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) {
+  const authUser = await getUser();
+  if (!authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { id: agentId } = await params;
-
-  // Get user
-  const { data: user } = await supabaseAdmin
-    .from('ocv_users')
-    .select('id')
-    .eq('clerk_id', userId)
-    .single();
-
-  if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
-  }
 
   // Get agent (verify ownership)
   const { data: agent, error: agentError } = await supabaseAdmin
     .from('ocv_agents')
     .select('*')
     .eq('id', agentId)
-    .eq('user_id', user.id)
+    .eq('user_id', authUser.id)
     .single();
 
   if (agentError || !agent) {
@@ -79,30 +68,19 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) {
+  const authUser = await getUser();
+  if (!authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { id: agentId } = await params;
-
-  // Get user
-  const { data: user } = await supabaseAdmin
-    .from('ocv_users')
-    .select('id')
-    .eq('clerk_id', userId)
-    .single();
-
-  if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
-  }
 
   // Delete agent (cascade will delete sessions and messages)
   const { error } = await supabaseAdmin
     .from('ocv_agents')
     .delete()
     .eq('id', agentId)
-    .eq('user_id', user.id);
+    .eq('user_id', authUser.id);
 
   if (error) {
     return NextResponse.json({ error: 'Failed to delete agent' }, { status: 500 });
