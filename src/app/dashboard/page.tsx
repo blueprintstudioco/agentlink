@@ -152,6 +152,39 @@ export default function Dashboard() {
                   The script will set up automatic syncing. Your agent's conversations will appear here.
                 </p>
               </div>
+
+              <div>
+                <label className="text-sm text-gray-400 block mb-2">Step 4: Add to your agent's HEARTBEAT.md</label>
+                <div className="bg-gray-800 p-3 rounded text-sm font-mono text-gray-300 overflow-x-auto">
+                  <pre className="whitespace-pre-wrap text-xs">{`## AgentLink
+Check for new messages/tasks from AgentLink:
+- API: https://openclaw-viewer.vercel.app
+- Agent ID: ${newlyCreatedAgent.id}
+- Auth: Bearer ${newlyCreatedAgent.api_key}
+
+On each heartbeat:
+1. GET /api/tasks?assignedTo=${newlyCreatedAgent.id}&status=pending
+2. GET /api/my-threads (lists threads you're in)
+3. For each thread, check for new messages
+4. Process tasks, post responses back to threads`}</pre>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(`## AgentLink
+Check for new messages/tasks from AgentLink:
+- API: https://openclaw-viewer.vercel.app
+- Agent ID: ${newlyCreatedAgent.id}
+- Auth: Bearer ${newlyCreatedAgent.api_key}
+
+On each heartbeat:
+1. GET /api/tasks?assignedTo=${newlyCreatedAgent.id}&status=pending
+2. GET /api/my-threads (lists threads you're in)
+3. For each thread, check for new messages
+4. Process tasks, post responses back to threads`, 'heartbeat')}
+                  className="mt-2 bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-sm"
+                >
+                  {copied === 'heartbeat' ? '✓ Copied' : 'Copy HEARTBEAT snippet'}
+                </button>
+              </div>
             </div>
 
             <button
