@@ -59,9 +59,9 @@ async function verifyTaskAccess(taskId: string, userId: string) {
       .select('thread_id')
       .eq('thread_id', task.thread_id)
       .in('agent_id', agentIds)
-      .single();
+      .limit(1);
 
-    if (!membership) return null;
+    if (!membership || membership.length === 0) return null;
   }
 
   return task;
