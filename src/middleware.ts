@@ -32,9 +32,11 @@ export async function middleware(request: NextRequest) {
   // Refresh session if needed
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Public routes that don't need auth (API routes handle their own auth via API key)
-  const publicRoutes = ['/', '/auth', '/api/webhook', '/api/connect', '/api/team-script', '/api/threads', '/api/my-threads'];
-  const isPublicRoute = publicRoutes.some(route => 
+  // Public routes that don't need middleware auth
+  // All /api routes handle their own auth internally (via API key or cookies)
+  const publicRoutes = ['/', '/auth'];
+  const isApiRoute = request.nextUrl.pathname.startsWith('/api/');
+  const isPublicRoute = isApiRoute || publicRoutes.some(route => 
     request.nextUrl.pathname === route || 
     request.nextUrl.pathname.startsWith(route + '/')
   );
