@@ -82,6 +82,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to insert messages' }, { status: 500 });
     }
 
+    // Update agent's last_synced_at timestamp
+    await supabaseAdmin
+      .from('ocv_agents')
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq('id', agent.id);
+
     return NextResponse.json({
       success: true,
       sessionId: session.id,

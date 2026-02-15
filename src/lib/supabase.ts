@@ -70,3 +70,54 @@ export interface Message {
   timestamp: string;
   created_at: string;
 }
+
+export interface Workflow {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  trigger_type: 'manual' | 'schedule' | 'webhook' | 'task_complete' | 'message';
+  trigger_config: Record<string, unknown>;
+  steps: WorkflowStep[];
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowStep {
+  id: string;
+  type: 'agent_call' | 'condition' | 'transform' | 'delay' | 'webhook' | 'set_context';
+  name: string;
+  config: Record<string, unknown>;
+  on_success?: string;
+  on_failure?: string;
+}
+
+export interface WorkflowRun {
+  id: string;
+  workflow_id: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  current_step: number;
+  context: Record<string, unknown>;
+  error: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface Task {
+  id: string;
+  thread_id: string | null;
+  title: string;
+  description: string | null;
+  assigned_to: string | null;
+  created_by: string | null;
+  status: 'pending' | 'in_progress' | 'review' | 'complete' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  due_date: string | null;
+  deliverable: string | null;
+  requires_approval: boolean;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}

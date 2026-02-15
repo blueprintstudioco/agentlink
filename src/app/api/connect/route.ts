@@ -74,20 +74,29 @@ const https = require('https');
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'agentlink.json')));
 const statePath = path.join(__dirname, 'agentlink-state.json');
 
-let state = {};
-try { state = JSON.parse(fs.readFileSync(statePath)); } catch {}
+// State tracks: { sessions: { sessionKey: { mtime, lastTimestamp } } }
+let state = { sessions: {} };
+try { state = JSON.parse(fs.readFileSync(statePath)); if (!state.sessions) state = { sessions: state }; } catch {}
 
 const files = fs.readdirSync(config.sessionsDir).filter(f => f.endsWith('.jsonl'));
 
 async function sync() {
   for (const file of files) {
+    const sessionKey = file.replace('.jsonl','');
     const fp = path.join(config.sessionsDir, file);
     const mtime = fs.statSync(fp).mtimeMs;
-    if (state[file] === mtime) continue;
+    const sessionState = state.sessions[sessionKey] || {};
+    
+    // Skip if file hasn't changed
+    if (sessionState.mtime === mtime) continue;
     
     const lines = fs.readFileSync(fp, 'utf8').trim().split('\\\\n');
+    const lastTimestamp = sessionState.lastTimestamp || '1970-01-01T00:00:00Z';
+    
+    // Only get messages newer than last sync
     const messages = lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean)
       .filter(m => m.type === 'message' && m.message && m.message.role)
+      .filter(m => (m.timestamp || '9999') > lastTimestamp)
       .map(m => ({
         role: m.message.role,
         content: typeof m.message.content === 'string' ? m.message.content : null,
@@ -95,9 +104,12 @@ async function sync() {
         timestamp: m.timestamp || new Date().toISOString()
       }));
     
-    if (!messages.length) continue;
+    if (!messages.length) {
+      state.sessions[sessionKey] = { mtime, lastTimestamp };
+      continue;
+    }
     
-    const data = JSON.stringify({ sessionKey: file.replace('.jsonl',''), messages });
+    const data = JSON.stringify({ sessionKey, messages });
     const url = new URL(config.webhookUrl);
     
     await new Promise((resolve, reject) => {
@@ -113,10 +125,12 @@ async function sync() {
       req.end();
     });
     
-    state[file] = mtime;
-    console.log('✓', file);
+    // Update state with new mtime and latest timestamp
+    const newLastTimestamp = messages[messages.length - 1].timestamp;
+    state.sessions[sessionKey] = { mtime, lastTimestamp: newLastTimestamp };
+    console.log('✓', file, '(' + messages.length + ' new messages)');
   }
-  fs.writeFileSync(statePath, JSON.stringify(state));
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 }
 
 sync().then(() => console.log('Sync complete')).catch(console.error);

@@ -133,5 +133,48 @@ export async function POST(
     .update({ updated_at: new Date().toISOString() })
     .eq('id', threadId);
 
+  // Fire webhooks to other agents in thread (fire and forget)
+  triggerWebhooks(threadId, agent.id, message).catch(console.error);
+
   return NextResponse.json({ message });
+}
+
+// Fire webhooks to other agents in the thread
+async function triggerWebhooks(threadId: string, fromAgentId: string, message: Record<string, unknown>) {
+  // Get all OTHER agents in this thread with webhook URLs
+  const { data: members } = await supabaseAdmin
+    .from('ocv_agent_thread_members')
+    .select(`
+      agent_id,
+      agent:ocv_agents(id, webhook_url)
+    `)
+    .eq('thread_id', threadId)
+    .neq('agent_id', fromAgentId);
+
+  if (!members?.length) return;
+
+  const webhookPayload = {
+    event: 'thread_message',
+    thread_id: threadId,
+    message
+  };
+
+  // Fire webhooks in parallel, don't await
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const webhookPromises = (members as any[])
+    .filter(m => m.agent?.webhook_url)
+    .map(async (m) => {
+      try {
+        await fetch(m.agent.webhook_url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookPayload),
+          signal: AbortSignal.timeout(5000) // 5s timeout
+        });
+      } catch (e) {
+        console.error(`Webhook to agent ${m.agent.id} failed:`, e);
+      }
+    });
+
+  await Promise.allSettled(webhookPromises);
 }
