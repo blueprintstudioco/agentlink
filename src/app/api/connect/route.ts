@@ -87,10 +87,11 @@ async function sync() {
     
     const lines = fs.readFileSync(fp, 'utf8').trim().split('\\\\n');
     const messages = lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean)
-      .filter(m => m.role).map(m => ({
-        role: m.role,
-        content: typeof m.content === 'string' ? m.content : null,
-        contentJson: typeof m.content !== 'string' ? m.content : undefined,
+      .filter(m => m.type === 'message' && m.message && m.message.role)
+      .map(m => ({
+        role: m.message.role,
+        content: typeof m.message.content === 'string' ? m.message.content : null,
+        contentJson: typeof m.message.content !== 'string' ? m.message.content : undefined,
         timestamp: m.timestamp || new Date().toISOString()
       }));
     
