@@ -6,6 +6,26 @@ interface RouteParams {
   params: Promise<{ taskId: string }>;
 }
 
+// Helper to get user ID from either cookie auth or API key
+async function getAuthUserId(request: NextRequest): Promise<string | null> {
+  // Check for API key auth first
+  const apiKey = request.headers.get('Authorization')?.replace('Bearer ', '');
+  
+  if (apiKey?.startsWith('ocv_')) {
+    const { data: agent } = await supabaseAdmin
+      .from('ocv_agents')
+      .select('user_id')
+      .eq('api_key', apiKey)
+      .single();
+    
+    return agent?.user_id || null;
+  }
+  
+  // Fall back to cookie auth
+  const authUser = await getUser();
+  return authUser?.id || null;
+}
+
 // Helper to verify task access
 async function verifyTaskAccess(taskId: string, userId: string) {
   // Get user's agents
@@ -49,13 +69,13 @@ async function verifyTaskAccess(taskId: string, userId: string) {
 
 // GET /api/tasks/[taskId] - Get single task
 export async function GET(request: NextRequest, { params }: RouteParams) {
-  const authUser = await getUser();
-  if (!authUser) {
+  const userId = await getAuthUserId(request);
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { taskId } = await params;
-  const task = await verifyTaskAccess(taskId, authUser.id);
+  const task = await verifyTaskAccess(taskId, userId);
 
   if (!task) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
@@ -66,13 +86,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 // PATCH /api/tasks/[taskId] - Update task
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
-  const authUser = await getUser();
-  if (!authUser) {
+  const userId = await getAuthUserId(request);
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { taskId } = await params;
-  const existingTask = await verifyTaskAccess(taskId, authUser.id);
+  const existingTask = await verifyTaskAccess(taskId, userId);
 
   if (!existingTask) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
@@ -130,13 +150,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
 // DELETE /api/tasks/[taskId] - Delete task
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
-  const authUser = await getUser();
-  if (!authUser) {
+  const userId = await getAuthUserId(request);
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { taskId } = await params;
-  const existingTask = await verifyTaskAccess(taskId, authUser.id);
+  const existingTask = await verifyTaskAccess(taskId, userId);
 
   if (!existingTask) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });

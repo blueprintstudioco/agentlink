@@ -3,24 +3,52 @@ import { getUser } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase';
 
 // GET /api/tasks - List tasks (optionally filtered by thread)
+// Supports both user auth (cookies) and agent auth (API key)
 export async function GET(request: NextRequest) {
-  const authUser = await getUser();
-  if (!authUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const { searchParams } = new URL(request.url);
   const threadId = searchParams.get('threadId');
   const status = searchParams.get('status');
   const assignedTo = searchParams.get('assignedTo');
+  
+  // Check for API key auth first (for agents)
+  const apiKey = request.headers.get('Authorization')?.replace('Bearer ', '');
+  
+  let agentIds: string[] = [];
+  
+  if (apiKey?.startsWith('ocv_')) {
+    // Agent auth - get the agent making the request
+    const { data: agent } = await supabaseAdmin
+      .from('ocv_agents')
+      .select('id, user_id')
+      .eq('api_key', apiKey)
+      .single();
+    
+    if (!agent) {
+      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+    }
+    
+    // Get all agents owned by the same user (so agent can see tasks in shared threads)
+    const { data: userAgents } = await supabaseAdmin
+      .from('ocv_agents')
+      .select('id')
+      .eq('user_id', agent.user_id);
+    
+    agentIds = userAgents?.map(a => a.id) || [];
+  } else {
+    // User auth (cookies)
+    const authUser = await getUser();
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  // Get user's agents to filter accessible tasks
-  const { data: agents } = await supabaseAdmin
-    .from('ocv_agents')
-    .select('id')
-    .eq('user_id', authUser.id);
+    // Get user's agents to filter accessible tasks
+    const { data: agents } = await supabaseAdmin
+      .from('ocv_agents')
+      .select('id')
+      .eq('user_id', authUser.id);
 
-  const agentIds = agents?.map(a => a.id) || [];
+    agentIds = agents?.map(a => a.id) || [];
+  }
   
   if (agentIds.length === 0) {
     return NextResponse.json({ tasks: [] });
