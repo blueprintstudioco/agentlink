@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase';
 import {
   LayoutDashboard, Inbox, FolderKanban, Calendar, Brain, Users, Building2,
@@ -124,6 +124,7 @@ export default function MissionControl() {
   const [chatAgent, setChatAgent] = useState<'team' | 'pip' | 'bubo'>('team');
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const supabase = createSupabaseBrowserClient();
 
@@ -137,6 +138,13 @@ export default function MissionControl() {
     if (activeTab === 'chat') loadChatMessages();
   }, [activeTab, authed, chatAgent]);
   
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
+
   // Realtime subscription for chat
   useEffect(() => {
     if (!authed || activeTab !== 'chat') return;
@@ -526,6 +534,7 @@ export default function MissionControl() {
                       </div>
                     </div>
                   ))}
+                  <div ref={chatEndRef} />
                 </div>
 
                 {/* Input */}
