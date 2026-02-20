@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase';
 
 const USER_ID = '9452a23f-a139-42cd-83e4-732f188a07ff';
@@ -13,20 +13,93 @@ function isAuthed(): boolean {
   if (typeof window === 'undefined') return false;
   return document.cookie.includes(`${AUTH_COOKIE}=1`);
 }
+
 function setAuth() {
   document.cookie = `${AUTH_COOKIE}=1; path=/; max-age=${60 * 60 * 24 * 30}`;
 }
+
 function clearAuth() {
   document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0`;
 }
 
-interface Task { id: string; title: string; description: string | null; status: string; assigned_agent: string | null; }
-interface QuickActionData { id: string; name: string; description: string | null; icon: string | null; }
-interface CronJob { id: string; name: string; schedule: string; next_run: string | null; status: string; description: string | null; }
-interface Agent { id: string; name: string; role: string; description: string | null; avatar_emoji: string | null; status: string; capabilities: string[] | null; }
-interface MemoryFile { filename: string; content: string; preview: string; lastModified: string; isMainMemory?: boolean; }
-interface Activity { id: string; agent: string | null; summary: string | null; created_at: string; }
-interface Content { id: string; title: string | null; body: string; platform: string | null; status: string; }
+interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  assigned_agent: string | null;
+}
+
+interface QuickActionData {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+}
+
+interface CronJob {
+  id: string;
+  name: string;
+  schedule: string;
+  next_run: string | null;
+  status: string;
+  description: string | null;
+}
+
+interface Agent {
+  id: string;
+  name: string;
+  role: string;
+  description: string | null;
+  avatar_emoji: string | null;
+  status: string;
+  capabilities: string[] | null;
+}
+
+interface MemoryFile {
+  filename: string;
+  content: string;
+  preview: string;
+  lastModified: string;
+  isMainMemory?: boolean;
+}
+
+interface Activity {
+  id: string;
+  agent: string | null;
+  summary: string | null;
+  created_at: string;
+}
+
+interface Content {
+  id: string;
+  title: string | null;
+  body: string;
+  platform: string | null;
+  status: string;
+}
+
+function Sparkline() {
+  return (
+    <svg viewBox="0 0 96 24" className="h-6 w-24" aria-hidden>
+      <polyline
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        points="0,18 14,16 28,19 42,13 56,12 70,9 84,11 96,6"
+      />
+    </svg>
+  );
+}
+
+function EmptyState({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="empty-state">
+      <p className="text-sm text-[var(--text-primary)]">{title}</p>
+      <p className="text-xs text-[var(--text-muted)]">{detail}</p>
+    </div>
+  );
+}
 
 export default function MissionControl() {
   const [authed, setAuthedState] = useState<boolean | null>(null);
@@ -44,31 +117,43 @@ export default function MissionControl() {
   const [content, setContent] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTask, setNewTask] = useState('');
-  
+
   const supabase = createSupabaseBrowserClient();
 
-  useEffect(() => { setAuthedState(isAuthed()); }, []);
-  useEffect(() => { if (authed) loadData(); }, [authed]);
   useEffect(() => {
-    if (!authed) return;
-    if (activeTab === 'memory') loadMemories();
+    setAuthedState(isAuthed());
+  }, []);
+
+  useEffect(() => {
+    if (authed) loadData();
+  }, [authed]);
+
+  useEffect(() => {
+    if (!authed || activeTab !== 'memory') return;
+    loadMemories();
   }, [activeTab, authed]);
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (password === CORRECT_PASSWORD) { setAuth(); setAuthedState(true); }
-    else { setAuthError('Wrong password'); }
+    if (password === CORRECT_PASSWORD) {
+      setAuth();
+      setAuthedState(true);
+      setAuthError('');
+      return;
+    }
+    setAuthError('Wrong password');
   }
 
   async function loadData() {
     const [t, a, c, cr, ag, act] = await Promise.all([
       supabase.from('mc_tasks').select('*').eq('user_id', USER_ID).neq('status', 'done').limit(10),
       supabase.from('mc_actions').select('*').eq('user_id', USER_ID).order('sort_order'),
-      supabase.from('mc_content').select('*').eq('user_id', USER_ID).neq('status', 'published').limit(5),
+      supabase.from('mc_content').select('*').eq('user_id', USER_ID).neq('status', 'published').limit(10),
       supabase.from('mc_cron_jobs').select('*').eq('user_id', USER_ID),
       supabase.from('mc_agents').select('*').eq('user_id', USER_ID),
-      supabase.from('mc_activity').select('*').eq('user_id', USER_ID).order('created_at', { ascending: false }).limit(10),
+      supabase.from('mc_activity').select('*').eq('user_id', USER_ID).order('created_at', { ascending: false }).limit(12),
     ]);
+
     setTasks(t.data || []);
     setActions(a.data || []);
     setContent(c.data || []);
@@ -83,319 +168,448 @@ export default function MissionControl() {
       const res = await fetch('/api/memories');
       const data = await res.json();
       setMemories(data.memories || []);
-    } catch (e) { console.error(e); }
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
     if (!newTask.trim()) return;
     const { data } = await supabase.from('mc_tasks').insert({ user_id: USER_ID, title: newTask }).select().single();
-    if (data) { setTasks([data, ...tasks]); setNewTask(''); }
+    if (!data) return;
+    setTasks([data, ...tasks]);
+    setNewTask('');
   }
 
   async function completeTask(id: string) {
     await supabase.from('mc_tasks').update({ status: 'done' }).eq('id', id);
-    setTasks(tasks.filter(t => t.id !== id));
+    setTasks(tasks.filter((task) => task.id !== id));
   }
 
-  const filteredMemories = memories.filter(m => !memorySearch || m.filename.toLowerCase().includes(memorySearch.toLowerCase()) || m.content.toLowerCase().includes(memorySearch.toLowerCase()));
+  const filteredMemories = useMemo(
+    () =>
+      memories.filter(
+        (m) =>
+          !memorySearch ||
+          m.filename.toLowerCase().includes(memorySearch.toLowerCase()) ||
+          m.content.toLowerCase().includes(memorySearch.toLowerCase()),
+      ),
+    [memorySearch, memories],
+  );
 
-  if (authed === null) return <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500">Loading...</div>;
+  const navItems = [
+    { id: 'dashboard' as TabType, label: 'Dashboard', icon: '◫' },
+    { id: 'calendar' as TabType, label: 'Calendar', icon: '◷' },
+    { id: 'memory' as TabType, label: 'Memory', icon: '◎' },
+    { id: 'team' as TabType, label: 'Team', icon: '◉' },
+  ];
+
+  const stats = [
+    {
+      label: 'Agents Online',
+      value: agents.filter((a) => a.status === 'online').length,
+      sub: `${agents.length} total agents`,
+    },
+    {
+      label: 'Scheduled Jobs',
+      value: cronJobs.filter((j) => j.status === 'active').length,
+      sub: `${cronJobs.length} configured`,
+    },
+    {
+      label: 'Tasks Due Today',
+      value: tasks.length,
+      sub: 'Active queue',
+    },
+    {
+      label: 'Drafts In Pipeline',
+      value: content.length,
+      sub: 'Awaiting publish',
+    },
+  ];
+
+  if (authed === null || loading) {
+    return (
+      <div className="min-h-screen app-shell grid place-items-center text-[var(--text-muted)]">
+        Loading Mission Control...
+      </div>
+    );
+  }
 
   if (!authed) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 w-full max-w-sm">
-          <div className="text-center mb-8">
-            <div className="text-5xl mb-4">🎛️</div>
-            <h1 className="text-xl font-semibold text-white">Mission Control</h1>
-            <p className="text-zinc-500 text-sm mt-1">Enter password to continue</p>
+      <div className="min-h-screen app-shell grid place-items-center px-4">
+        <div className="surface-card w-full max-w-sm p-8">
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">◫</div>
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">Mission Control</h1>
+            <p className="mt-2 text-sm text-[var(--text-muted)]">Enter password to continue</p>
           </div>
-          <form onSubmit={handleLogin}>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder:text-zinc-500 focus:outline-none focus:border-orange-500 mb-4" />
-            {authError && <p className="text-red-400 text-sm mb-4">{authError}</p>}
-            <button type="submit" className="w-full bg-orange-600 hover:bg-orange-500 text-white font-medium py-3 rounded-xl transition-colors">Enter</button>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              className="input-base"
+            />
+            {authError && <p className="text-sm text-rose-400">{authError}</p>}
+            <button type="submit" className="btn-primary w-full">
+              Enter
+            </button>
           </form>
         </div>
       </div>
     );
   }
 
-  if (loading) return <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500">Loading...</div>;
-
-  const navItems = [
-    { id: 'dashboard' as TabType, label: 'Dashboard', icon: '📊' },
-    { id: 'calendar' as TabType, label: 'Calendar', icon: '📅' },
-    { id: 'memory' as TabType, label: 'Memory', icon: '🧠' },
-    { id: 'team' as TabType, label: 'Team', icon: '👥' },
-  ];
-
   return (
-    <div className="min-h-screen bg-zinc-950 flex">
-      {/* Sidebar */}
-      <aside className="w-56 bg-zinc-900/50 border-r border-zinc-800/50 flex flex-col">
-        <div className="p-4 border-b border-zinc-800/50">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center text-sm">🎛️</div>
-            <span className="font-semibold">Mission Control</span>
-          </div>
-        </div>
-        <nav className="flex-1 p-3 space-y-1">
-          {navItems.map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === item.id ? 'bg-orange-600/20 text-orange-400' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}>
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="p-3 border-t border-zinc-800/50">
-          <button onClick={() => { clearAuth(); setAuthedState(false); }} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300">
-            <span>🚪</span><span>Logout</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto p-6">
-
-          {/* DASHBOARD */}
-          {activeTab === 'dashboard' && (
-            <div className="space-y-6">
+    <div className="min-h-screen app-shell">
+      <div className="mx-auto flex w-full max-w-[1320px]">
+        <aside className="hidden w-64 shrink-0 border-r border-[var(--border-subtle)]/80 bg-[var(--surface)]/65 p-4 backdrop-blur md:flex md:flex-col">
+          <div className="mb-6 rounded-2xl border border-[var(--border-subtle)]/80 bg-[var(--surface-elev)]/70 p-4">
+            <div className="flex items-center gap-3">
+              <div className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--accent-soft)] text-sm text-[var(--accent)]">◫</div>
               <div>
-                <h1 className="text-2xl font-semibold">Welcome back</h1>
-                <p className="text-zinc-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">Mission Control</p>
+                <p className="text-xs text-[var(--text-muted)]">Personal Command Center</p>
               </div>
+            </div>
+          </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-4 gap-4">
-                {[
-                  { label: 'Agents Online', value: agents.filter(a => a.status === 'online').length, sub: `${agents.length} total` },
-                  { label: 'Scheduled Jobs', value: cronJobs.filter(j => j.status === 'active').length, sub: `${cronJobs.length} configured` },
-                  { label: 'Tasks Active', value: tasks.length, sub: '0 due today' },
-                  { label: 'Content Drafts', value: content.length, sub: 'In pipeline' },
-                ].map(s => (
-                  <div key={s.label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                    <div className="text-xs text-zinc-500 mb-1">{s.label}</div>
-                    <div className="text-2xl font-semibold">{s.value}</div>
-                    <div className="text-xs text-zinc-600">{s.sub}</div>
-                  </div>
-                ))}
-              </div>
+          <nav className="space-y-1">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`nav-item ${activeTab === item.id ? 'nav-item-active' : ''}`}
+              >
+                <span className="text-sm">{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </nav>
 
-              {/* Quick Actions + Focus */}
-              <div className="grid grid-cols-3 gap-6">
-                <div className="col-span-2">
-                  <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Quick Actions</div>
-                  <div className="grid grid-cols-3 gap-3">
-                    {actions.slice(0, 6).map(a => (
-                      <button key={a.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-left hover:bg-zinc-800 hover:border-zinc-700 transition-colors group">
-                        <div className="text-xl mb-2">{a.icon || '⚡'}</div>
-                        <div className="font-medium text-sm">{a.name}</div>
-                        {a.description && <div className="text-xs text-zinc-500 mt-1">{a.description}</div>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Today's Focus</div>
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
-                    {cronJobs.slice(0, 4).map(j => (
-                      <div key={j.id} className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{j.name}</div>
-                          <div className="text-xs text-zinc-500">{j.next_run ? new Date(j.next_run).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</div>
-                        </div>
+          <div className="mt-auto pt-6">
+            <button
+              onClick={() => {
+                clearAuth();
+                setAuthedState(false);
+              }}
+              className="nav-item text-[var(--text-muted)]"
+            >
+              <span className="text-sm">↗</span>
+              <span>Logout</span>
+            </button>
+          </div>
+        </aside>
+
+        <main className="min-w-0 flex-1 p-4 md:p-8">
+          <div className="mx-auto w-full max-w-6xl space-y-8">
+            {activeTab === 'dashboard' && (
+              <div className="space-y-8">
+                <header className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]">Mission Control</p>
+                  <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)] md:text-4xl">Daily Operations Dashboard</h1>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    {new Date().toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </p>
+                </header>
+
+                <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {stats.map((stat) => (
+                    <article key={stat.label} className="surface-card p-5">
+                      <p className="meta-label">{stat.label}</p>
+                      <p className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-primary)]">{stat.value}</p>
+                      <div className="mt-4 flex items-center justify-between text-[var(--accent)]">
+                        <Sparkline />
+                        <span className="text-xs text-[var(--text-muted)]">{stat.sub}</span>
                       </div>
-                    ))}
-                    {cronJobs.length === 0 && <div className="text-zinc-500 text-sm text-center py-2">No scheduled jobs</div>}
-                  </div>
-                </div>
-              </div>
+                    </article>
+                  ))}
+                </section>
 
-              {/* Tasks + Activity */}
-              <div className="grid grid-cols-3 gap-6">
-                <div className="col-span-2">
-                  <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Tasks <span className="text-zinc-600">({tasks.length})</span></div>
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                    <form onSubmit={addTask} className="p-3 border-b border-zinc-800">
-                      <input value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Add a new task..."
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm placeholder:text-zinc-500 focus:outline-none focus:border-orange-500" />
-                    </form>
-                    {tasks.length === 0 ? (
-                      <div className="py-8 text-center text-zinc-500 text-sm">All caught up</div>
-                    ) : (
-                      <div className="divide-y divide-zinc-800">
-                        {tasks.map(t => (
-                          <div key={t.id} className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50">
-                            <button onClick={() => completeTask(t.id)} className="w-4 h-4 rounded border border-zinc-600 hover:border-orange-500 hover:bg-orange-500/20 flex-shrink-0"></button>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm">{t.title}</div>
-                            </div>
-                            {t.assigned_agent && <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded">{t.assigned_agent}</span>}
+                <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                  <article className="surface-card p-5 xl:col-span-2">
+                    <div className="mb-4">
+                      <h2 className="section-title">Quick Actions</h2>
+                      <p className="section-subtitle">Launch common workflows quickly.</p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {actions.slice(0, 6).map((action) => (
+                        <button key={action.id} className="action-card text-left">
+                          <div className="mb-3 grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent-soft)] text-sm text-[var(--accent)]">
+                            {action.icon || '⚡'}
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Activity</div>
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                    {activity.length === 0 ? (
-                      <div className="text-zinc-500 text-sm text-center py-4">No recent activity</div>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">{action.name}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)]">{action.description || 'Run a quick operation'}</p>
+                        </button>
+                      ))}
+                      {actions.length === 0 && (
+                        <div className="sm:col-span-2 lg:col-span-3">
+                          <EmptyState title="No actions configured" detail="Create actions to populate this launcher." />
+                        </div>
+                      )}
+                    </div>
+                  </article>
+
+                  <article className="surface-card p-5">
+                    <div className="mb-4">
+                      <h2 className="section-title">Today&apos;s Focus</h2>
+                      <p className="section-subtitle">Upcoming scheduled jobs.</p>
+                    </div>
+                    {cronJobs.length === 0 ? (
+                      <EmptyState title="No jobs scheduled" detail="Your timeline will appear here." />
                     ) : (
                       <div className="space-y-3">
-                        {activity.slice(0, 5).map(a => (
-                          <div key={a.id} className="flex items-start gap-2">
-                            <div className="text-sm">{a.agent ? '🤖' : '👤'}</div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm text-zinc-300">{a.summary}</div>
-                              <div className="text-xs text-zinc-600">{new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        {cronJobs.slice(0, 5).map((job) => (
+                          <div key={job.id} className="row-item">
+                            <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--accent)]" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-[var(--text-primary)]">{job.name}</p>
+                              <p className="text-xs text-[var(--text-muted)]">
+                                {job.next_run
+                                  ? new Date(job.next_run).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                  : 'Not scheduled'}
+                              </p>
                             </div>
                           </div>
                         ))}
                       </div>
                     )}
-                  </div>
-                </div>
-              </div>
+                  </article>
+                </section>
 
-              {/* Content Pipeline */}
-              <div>
-                <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">Content Pipeline</div>
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
-                  {content.length === 0 ? (
-                    <div className="py-8 text-center text-zinc-500 text-sm">No content in pipeline</div>
-                  ) : (
-                    <div className="divide-y divide-zinc-800">
-                      {content.map(c => (
-                        <div key={c.id} className="flex items-center gap-4 px-4 py-3">
-                          <div className="text-xl">{c.platform === 'twitter' ? '𝕏' : '📝'}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm">{c.title || c.body.slice(0, 50)}</div>
-                            <div className="text-xs text-zinc-500">{c.platform || 'Draft'}</div>
+                <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                  <article className="surface-card p-5 xl:col-span-2">
+                    <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+                      <div>
+                        <h2 className="section-title">Tasks</h2>
+                        <p className="section-subtitle">Track active work and add new items.</p>
+                      </div>
+                      <p className="meta-label">{tasks.length} active</p>
+                    </div>
+
+                    <form onSubmit={addTask} className="mb-4 flex gap-2">
+                      <input
+                        value={newTask}
+                        onChange={(e) => setNewTask(e.target.value)}
+                        placeholder="Add a new task..."
+                        className="input-base"
+                      />
+                      <button type="submit" className="btn-primary shrink-0 px-4">
+                        Add
+                      </button>
+                    </form>
+
+                    {tasks.length === 0 ? (
+                      <EmptyState title="All caught up" detail="No active tasks for today." />
+                    ) : (
+                      <div className="space-y-2">
+                        {tasks.map((task) => (
+                          <div key={task.id} className="row-item justify-between gap-4">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <button
+                                onClick={() => completeTask(task.id)}
+                                className="h-4 w-4 shrink-0 rounded-full border border-[var(--border-subtle)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                                aria-label={`Complete ${task.title}`}
+                              />
+                              <p className="truncate text-sm text-[var(--text-primary)]">{task.title}</p>
+                            </div>
+                            {task.assigned_agent && <span className="tag">{task.assigned_agent}</span>}
                           </div>
-                          <span className="text-xs bg-zinc-800 px-2 py-0.5 rounded">{c.status}</span>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+
+                  <article className="surface-card p-5">
+                    <div className="mb-4">
+                      <h2 className="section-title">Activity Feed</h2>
+                      <p className="section-subtitle">Latest agent and operator updates.</p>
+                    </div>
+                    {activity.length === 0 ? (
+                      <EmptyState title="No recent activity" detail="Events will stream in here." />
+                    ) : (
+                      <div className="space-y-3">
+                        {activity.slice(0, 6).map((event) => (
+                          <div key={event.id} className="timeline-item">
+                            <span className="timeline-dot" />
+                            <div className="min-w-0">
+                              <p className="line-clamp-2 text-sm text-[var(--text-primary)]">{event.summary || 'Activity update'}</p>
+                              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                {new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                </section>
+
+                <section className="surface-card p-5">
+                  <div className="mb-4">
+                    <h2 className="section-title">Content Pipeline</h2>
+                    <p className="section-subtitle">Drafts and queued content across channels.</p>
+                  </div>
+                  {content.length === 0 ? (
+                    <EmptyState title="No drafts in pipeline" detail="Create content to start tracking status." />
+                  ) : (
+                    <div className="space-y-2">
+                      {content.map((item) => (
+                        <div key={item.id} className="row-item justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--surface-elev)] text-xs text-[var(--text-secondary)]">
+                              {item.platform === 'twitter' ? '𝕏' : 'TXT'}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-[var(--text-primary)]">{item.title || item.body.slice(0, 80)}</p>
+                              <p className="text-xs text-[var(--text-muted)]">{item.platform || 'Draft'}</p>
+                            </div>
+                          </div>
+                          <span className="tag capitalize">{item.status}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
+                </section>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* CALENDAR */}
-          {activeTab === 'calendar' && (
-            <div className="space-y-6">
-              <div>
-                <h1 className="text-2xl font-semibold">Calendar</h1>
-                <p className="text-zinc-500">Scheduled jobs and cron tasks</p>
-              </div>
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
-                {cronJobs.length === 0 ? (
-                  <div className="py-12 text-center text-zinc-500">No scheduled jobs</div>
-                ) : (
-                  <div className="divide-y divide-zinc-800">
-                    {cronJobs.map(j => (
-                      <div key={j.id} className="flex items-center gap-4 px-4 py-4">
-                        <div className={`w-2 h-2 rounded-full ${j.status === 'active' ? 'bg-green-500' : 'bg-zinc-600'}`}></div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium">{j.name}</div>
-                          <div className="text-sm text-zinc-500">{j.description}</div>
-                        </div>
-                        <code className="text-xs bg-zinc-800 px-2 py-1 rounded font-mono">{j.schedule}</code>
-                        <div className="text-right text-sm">
-                          <div>{j.next_run ? new Date(j.next_run).toLocaleString() : '—'}</div>
-                          <div className="text-xs text-zinc-500">Next run</div>
-                        </div>
-                        <span className={`text-xs px-2 py-0.5 rounded ${j.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-zinc-800 text-zinc-400'}`}>{j.status}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+            {activeTab === 'calendar' && (
+              <div className="space-y-6">
+                <header>
+                  <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">Calendar</h1>
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">Scheduled jobs and recurring automation windows.</p>
+                </header>
 
-          {/* MEMORY */}
-          {activeTab === 'memory' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-semibold">Memory</h1>
-                  <p className="text-zinc-500">Knowledge base and daily notes</p>
-                </div>
-                <input value={memorySearch} onChange={e => setMemorySearch(e.target.value)} placeholder="Search..."
-                  className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm w-48 placeholder:text-zinc-500 focus:outline-none focus:border-orange-500" />
-              </div>
-              <div className="grid grid-cols-3 gap-6" style={{ height: 'calc(100vh - 200px)' }}>
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-auto">
-                  {filteredMemories.map(m => (
-                    <button key={m.filename} onClick={() => setSelectedMemory(m)}
-                      className={`w-full text-left px-4 py-3 border-b border-zinc-800 last:border-b-0 hover:bg-zinc-800 ${selectedMemory?.filename === m.filename ? 'bg-orange-500/10' : ''}`}>
-                      <div className="flex items-center gap-2">
-                        <span>{m.isMainMemory ? '📌' : '📝'}</span>
-                        <span className="font-medium text-sm">{m.filename}</span>
-                      </div>
-                      <div className="text-xs text-zinc-500 mt-1 truncate">{m.preview}</div>
-                    </button>
-                  ))}
-                </div>
-                <div className="col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl p-6 overflow-auto">
-                  {selectedMemory ? (
-                    <>
-                      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-zinc-800">
-                        <span className="text-2xl">{selectedMemory.isMainMemory ? '📌' : '📝'}</span>
-                        <div>
-                          <div className="font-semibold">{selectedMemory.filename}</div>
-                          <div className="text-xs text-zinc-500">{selectedMemory.lastModified}</div>
-                        </div>
-                      </div>
-                      <pre className="whitespace-pre-wrap text-sm font-mono text-zinc-400 leading-relaxed">{selectedMemory.content}</pre>
-                    </>
+                <section className="surface-card p-4">
+                  {cronJobs.length === 0 ? (
+                    <EmptyState title="No scheduled jobs" detail="Add cron jobs to view timeline details." />
                   ) : (
-                    <div className="h-full flex items-center justify-center text-zinc-500">Select a file</div>
+                    <div className="space-y-2">
+                      {cronJobs.map((job) => (
+                        <div key={job.id} className="row-item justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className={`h-2 w-2 rounded-full ${job.status === 'active' ? 'bg-emerald-400' : 'bg-[var(--text-muted)]'}`} />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-[var(--text-primary)]">{job.name}</p>
+                              <p className="truncate text-xs text-[var(--text-muted)]">{job.description || 'No description'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <code className="tag font-mono">{job.schedule}</code>
+                            <span className="tag capitalize">{job.status}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </div>
+                </section>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* TEAM */}
-          {activeTab === 'team' && (
-            <div className="space-y-6">
-              <div>
-                <h1 className="text-2xl font-semibold">Team</h1>
-                <p className="text-zinc-500">Your AI agent roster</p>
-              </div>
-              <div className="grid grid-cols-2 gap-6">
-                {agents.map(a => (
-                  <div key={a.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="w-14 h-14 bg-zinc-800 rounded-xl flex items-center justify-center text-3xl">{a.avatar_emoji || '🤖'}</div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-lg">{a.name}</div>
-                        <div className="text-zinc-500">{a.role}</div>
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded ${a.status === 'online' ? 'bg-green-500/20 text-green-400' : 'bg-zinc-800 text-zinc-500'}`}>{a.status}</span>
-                    </div>
-                    <p className="text-sm text-zinc-400 mb-4">{a.description}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {a.capabilities?.map(c => <span key={c} className="text-xs bg-zinc-800 text-zinc-400 px-2 py-1 rounded">{c}</span>)}
-                    </div>
+            {activeTab === 'memory' && (
+              <div className="space-y-6">
+                <header className="flex flex-wrap items-end justify-between gap-4">
+                  <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">Memory</h1>
+                    <p className="mt-2 text-sm text-[var(--text-secondary)]">Knowledge base and daily operational notes.</p>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                  <input
+                    value={memorySearch}
+                    onChange={(e) => setMemorySearch(e.target.value)}
+                    placeholder="Search memory"
+                    className="input-base w-full md:w-56"
+                  />
+                </header>
 
-        </div>
-      </main>
+                <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                  <div className="surface-card max-h-[65vh] overflow-auto p-2">
+                    {filteredMemories.length === 0 ? (
+                      <EmptyState title="No matching files" detail="Try another search term." />
+                    ) : (
+                      filteredMemories.map((memory) => (
+                        <button
+                          key={memory.filename}
+                          onClick={() => setSelectedMemory(memory)}
+                          className={`mb-1 w-full rounded-xl px-3 py-3 text-left transition ${
+                            selectedMemory?.filename === memory.filename
+                              ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]'
+                              : 'hover:bg-[var(--surface-elev)]'
+                          }`}
+                        >
+                          <p className="text-sm font-medium">{memory.filename}</p>
+                          <p className="mt-1 truncate text-xs text-[var(--text-muted)]">{memory.preview}</p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="surface-card col-span-1 max-h-[65vh] overflow-auto p-5 lg:col-span-2">
+                    {selectedMemory ? (
+                      <>
+                        <div className="mb-4 border-b border-[var(--border-subtle)] pb-4">
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">{selectedMemory.filename}</p>
+                          <p className="text-xs text-[var(--text-muted)]">{selectedMemory.lastModified}</p>
+                        </div>
+                        <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-[var(--text-secondary)]">
+                          {selectedMemory.content}
+                        </pre>
+                      </>
+                    ) : (
+                      <EmptyState title="Select a memory file" detail="Choose an item from the list to inspect content." />
+                    )}
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {activeTab === 'team' && (
+              <div className="space-y-6">
+                <header>
+                  <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">Team</h1>
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">AI agent roster, roles, and capabilities.</p>
+                </header>
+
+                <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {agents.map((agent) => (
+                    <article key={agent.id} className="surface-card p-5">
+                      <div className="mb-4 flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--surface-elev)] text-xl">
+                            {agent.avatar_emoji || '🤖'}
+                          </div>
+                          <div>
+                            <p className="text-base font-semibold text-[var(--text-primary)]">{agent.name}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{agent.role}</p>
+                          </div>
+                        </div>
+                        <span className={`tag ${agent.status === 'online' ? 'text-emerald-300' : 'text-[var(--text-muted)]'}`}>
+                          {agent.status}
+                        </span>
+                      </div>
+                      <p className="text-sm text-[var(--text-secondary)]">{agent.description || 'No description available.'}</p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {agent.capabilities?.map((capability) => (
+                          <span key={capability} className="tag">
+                            {capability}
+                          </span>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </section>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
