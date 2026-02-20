@@ -71,6 +71,108 @@ interface MemoryFile {
   content: string;
   preview: string;
   lastModified: string;
+  size?: number;
+  isMainMemory?: boolean;
+}
+
+// Simple markdown renderer component
+function MarkdownContent({ content }: { content: string }) {
+  const renderLine = (line: string, key: number) => {
+    // Headers
+    if (line.startsWith('#### ')) return <h4 key={key} className="text-base font-semibold text-gray-300 mt-3 mb-1">{renderInline(line.slice(5))}</h4>;
+    if (line.startsWith('### ')) return <h3 key={key} className="text-lg font-semibold text-gray-200 mt-4 mb-2">{renderInline(line.slice(4))}</h3>;
+    if (line.startsWith('## ')) return <h2 key={key} className="text-xl font-semibold text-white mt-5 mb-2">{renderInline(line.slice(3))}</h2>;
+    if (line.startsWith('# ')) return <h1 key={key} className="text-2xl font-bold text-white mt-6 mb-3">{renderInline(line.slice(2))}</h1>;
+    
+    // Horizontal rule
+    if (line.match(/^---+$/)) return <hr key={key} className="border-gray-700 my-4" />;
+    
+    // Bullet points
+    if (line.match(/^[-*] /)) return <li key={key} className="text-gray-300 ml-4 list-disc">{renderInline(line.slice(2))}</li>;
+    
+    // Numbered lists
+    if (line.match(/^\d+\. /)) return <li key={key} className="text-gray-300 ml-4 list-decimal">{renderInline(line.replace(/^\d+\. /, ''))}</li>;
+    
+    // Blockquote
+    if (line.startsWith('> ')) return <blockquote key={key} className="border-l-4 border-gray-600 pl-4 text-gray-400 italic my-2">{renderInline(line.slice(2))}</blockquote>;
+    
+    // Code block markers (skip them)
+    if (line.startsWith('```')) return null;
+    
+    // Table row
+    if (line.startsWith('|') && line.endsWith('|')) {
+      const cells = line.slice(1, -1).split('|').map(c => c.trim());
+      if (cells.every(c => c.match(/^-+$/))) return null; // Skip separator
+      return (
+        <tr key={key} className="border-b border-gray-800">
+          {cells.map((cell, i) => <td key={i} className="px-3 py-2 text-sm text-gray-300">{renderInline(cell)}</td>)}
+        </tr>
+      );
+    }
+    
+    // Empty line
+    if (!line.trim()) return <div key={key} className="h-2" />;
+    
+    // Regular paragraph
+    return <p key={key} className="text-gray-300 my-1">{renderInline(line)}</p>;
+  };
+
+  const renderInline = (text: string) => {
+    // Process inline formatting
+    let html = text
+      .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
+      .replace(/`([^`]+)`/g, '<code class="bg-gray-800 px-1.5 py-0.5 rounded text-orange-400 text-sm font-mono">$1</code>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-400 hover:underline" target="_blank" rel="noopener">$1</a>');
+    
+    return <span dangerouslySetInnerHTML={{ __html: html }} />;
+  };
+
+  const lines = content.split('\n');
+  let inTable = false;
+  const elements: React.ReactNode[] = [];
+  let tableRows: React.ReactNode[] = [];
+
+  lines.forEach((line, i) => {
+    const isTableRow = line.startsWith('|') && line.endsWith('|');
+    
+    if (isTableRow && !inTable) {
+      inTable = true;
+      tableRows = [];
+    }
+    
+    if (inTable && isTableRow) {
+      const row = renderLine(line, i);
+      if (row) tableRows.push(row);
+    } else if (inTable && !isTableRow) {
+      // End table
+      if (tableRows.length > 0) {
+        elements.push(
+          <table key={`table-${i}`} className="w-full my-4 border border-gray-800 rounded">
+            <tbody>{tableRows}</tbody>
+          </table>
+        );
+      }
+      inTable = false;
+      tableRows = [];
+      const el = renderLine(line, i);
+      if (el) elements.push(el);
+    } else {
+      const el = renderLine(line, i);
+      if (el) elements.push(el);
+    }
+  });
+
+  // Close any remaining table
+  if (tableRows.length > 0) {
+    elements.push(
+      <table key="table-end" className="w-full my-4 border border-gray-800 rounded">
+        <tbody>{tableRows}</tbody>
+      </table>
+    );
+  }
+
+  return <div>{elements}</div>;
 }
 
 export default function MissionControl() {
@@ -356,7 +458,7 @@ export default function MissionControl() {
             
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Memory List */}
-              <div className="lg:col-span-1 space-y-2 max-h-[70vh] overflow-y-auto">
+              <div className="lg:col-span-1 space-y-2 max-h-[70vh] overflow-y-auto pr-2">
                 {filteredMemories.length === 0 ? (
                   <div className="text-gray-500 text-center py-8">No memories found</div>
                 ) : (
@@ -370,9 +472,19 @@ export default function MissionControl() {
                           : 'border-gray-800 hover:border-gray-700'
                       }`}
                     >
-                      <div className="font-medium text-sm">{mem.filename}</div>
-                      <div className="text-xs text-gray-500 mt-1 truncate">{mem.preview}</div>
-                      <div className="text-xs text-gray-600 mt-1">{mem.lastModified}</div>
+                      <div className="flex items-center gap-2">
+                        <span>{mem.isMainMemory ? '📌' : '📝'}</span>
+                        <span className="font-medium text-sm">{mem.filename}</span>
+                        {mem.isMainMemory && (
+                          <span className="text-xs bg-orange-900/50 text-orange-300 px-1.5 py-0.5 rounded ml-auto">
+                            pinned
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1 line-clamp-2">{mem.preview}</div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        {new Date(mem.lastModified).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
                     </button>
                   ))
                 )}
@@ -382,10 +494,26 @@ export default function MissionControl() {
               <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-6 max-h-[70vh] overflow-y-auto">
                 {selectedMemory ? (
                   <>
-                    <h3 className="font-semibold text-lg mb-4 text-orange-400">{selectedMemory.filename}</h3>
-                    <pre className="whitespace-pre-wrap text-sm text-gray-300 font-mono leading-relaxed">
-                      {selectedMemory.content}
-                    </pre>
+                    <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-800">
+                      <span className="text-2xl">{selectedMemory.isMainMemory ? '📌' : '📝'}</span>
+                      <div>
+                        <h3 className="font-semibold text-lg text-orange-400">{selectedMemory.filename}</h3>
+                        <div className="text-xs text-gray-500">
+                          {new Date(selectedMemory.lastModified).toLocaleDateString('en-US', { 
+                            weekday: 'long', 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                          {selectedMemory.size && ` • ${(selectedMemory.size / 1024).toFixed(1)} KB`}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="prose prose-invert prose-sm max-w-none">
+                      <MarkdownContent content={selectedMemory.content} />
+                    </div>
                   </>
                 ) : (
                   <div className="text-gray-500 text-center py-12">
