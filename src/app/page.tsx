@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase';
 import {
   LayoutDashboard, Inbox, FolderKanban, Calendar, Brain, Users, Building2,
-  LogOut, Check, X, Clock, Zap, Send, ChevronRight, Activity
+  LogOut, Check, X, Clock, Zap, Send, ChevronRight, Activity, MessageCircle,
+  Loader2
 } from 'lucide-react';
 
 const USER_ID = '9452a23f-a139-42cd-83e4-732f188a07ff';
-type TabType = 'dashboard' | 'approvals' | 'projects' | 'calendar' | 'memory' | 'team' | 'office';
+type TabType = 'dashboard' | 'approvals' | 'projects' | 'calendar' | 'memory' | 'team' | 'office' | 'chat';
 
 const AUTH_COOKIE = 'mc_auth';
 const CORRECT_PASSWORD = 'brushworks2026';
@@ -33,6 +34,7 @@ interface Activity { id: string; agent: string | null; summary: string | null; c
 interface Content { id: string; title: string | null; body: string; platform: string | null; status: string; }
 interface Approval { id: string; type: string; content: string; recipient: string | null; status: string; created_at: string; }
 interface Project { id: string; name: string; description: string | null; status: string; due_date: string | null; }
+interface ChatMessage { id: string; from_agent: string | null; to_agent: string; content: string; status: string; created_at: string; }
 
 // Pixel Art Components for Office
 function OwlSprite({ working }: { working: boolean }) {
@@ -117,6 +119,11 @@ export default function MissionControl() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTask, setNewTask] = useState('');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatAgent, setChatAgent] = useState<'pip' | 'bubo'>('pip');
+  const [chatSending, setChatSending] = useState(false);
+  const [chatError, setChatError] = useState('');
 
   const supabase = createSupabaseBrowserClient();
 
@@ -127,7 +134,31 @@ export default function MissionControl() {
     if (activeTab === 'memory') loadMemories();
     if (activeTab === 'approvals') loadApprovals();
     if (activeTab === 'projects') loadProjects();
-  }, [activeTab, authed]);
+    if (activeTab === 'chat') loadChatMessages();
+  }, [activeTab, authed, chatAgent]);
+  
+  // Realtime subscription for chat
+  useEffect(() => {
+    if (!authed || activeTab !== 'chat') return;
+    
+    const channel = supabase
+      .channel('mc_messages_realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'mc_messages',
+        filter: `user_id=eq.${USER_ID}`
+      }, (payload) => {
+        const newMsg = payload.new as ChatMessage;
+        // Only add if it's for our current agent conversation
+        if (newMsg.to_agent === chatAgent || newMsg.from_agent === chatAgent) {
+          setChatMessages(prev => [...prev, newMsg]);
+        }
+      })
+      .subscribe();
+    
+    return () => { supabase.removeChannel(channel); };
+  }, [authed, activeTab, chatAgent]);
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -171,6 +202,53 @@ export default function MissionControl() {
     setProjects(data || []);
   }
 
+  async function loadChatMessages() {
+    setChatError('');
+    try {
+      const res = await fetch(`/api/chat?agent=${chatAgent}&limit=100`);
+      const data = await res.json();
+      if (data.needsSetup) {
+        setChatError('Chat table not set up yet. Run the SQL migration.');
+        return;
+      }
+      if (data.error) {
+        setChatError(data.error);
+        return;
+      }
+      setChatMessages(data.messages || []);
+    } catch (e) {
+      setChatError('Failed to load messages');
+    }
+  }
+
+  async function sendChatMessage(e: React.FormEvent) {
+    e.preventDefault();
+    if (!chatInput.trim() || chatSending) return;
+    
+    setChatSending(true);
+    setChatError('');
+    
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: chatInput, to_agent: chatAgent })
+      });
+      const data = await res.json();
+      
+      if (data.error) {
+        setChatError(data.error);
+      } else if (data.message) {
+        setChatMessages(prev => [...prev, data.message]);
+        setChatInput('');
+      }
+    } catch (e) {
+      setChatError('Failed to send message');
+    } finally {
+      setChatSending(false);
+    }
+  }
+
   async function handleApproval(id: string, status: 'approved' | 'rejected') {
     await supabase.from('mc_approvals').update({ status }).eq('id', id);
     setApprovals(approvals.filter(a => a.id !== id));
@@ -192,6 +270,7 @@ export default function MissionControl() {
 
   const navItems: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+    { id: 'chat', label: 'Chat', icon: <MessageCircle size={18} /> },
     { id: 'approvals', label: 'Approvals', icon: <Inbox size={18} /> },
     { id: 'projects', label: 'Projects', icon: <FolderKanban size={18} /> },
     { id: 'calendar', label: 'Calendar', icon: <Calendar size={18} /> },
@@ -376,6 +455,99 @@ export default function MissionControl() {
                     </div>
                   )}
                 </div>
+              </div>
+            </>
+          )}
+
+          {/* CHAT */}
+          {activeTab === 'chat' && (
+            <>
+              <header className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold">Chat</h1>
+                  <p className="text-sm text-[var(--text-secondary)] mt-1">Live conversation with your agents</p>
+                </div>
+                <div className="flex gap-2">
+                  {(['pip', 'bubo'] as const).map(agent => (
+                    <button
+                      key={agent}
+                      onClick={() => setChatAgent(agent)}
+                      className={`px-4 py-2 rounded-xl font-medium text-sm transition-all ${
+                        chatAgent === agent
+                          ? 'bg-[var(--accent)] text-white'
+                          : 'bg-[var(--surface-elev)] text-[var(--text-secondary)] hover:bg-[var(--surface-elev)]/80'
+                      }`}
+                    >
+                      {agent === 'pip' ? '🐦 Pip' : '🦉 Bubo'}
+                    </button>
+                  ))}
+                </div>
+              </header>
+
+              <div className="surface-card flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
+                {/* Messages */}
+                <div className="flex-1 overflow-auto p-4 space-y-3">
+                  {chatError && (
+                    <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl p-4 text-sm">
+                      {chatError}
+                    </div>
+                  )}
+                  {chatMessages.length === 0 && !chatError && (
+                    <div className="h-full flex items-center justify-center text-[var(--text-muted)]">
+                      <div className="text-center">
+                        <MessageCircle size={48} className="mx-auto mb-4 opacity-50" />
+                        <p>No messages yet</p>
+                        <p className="text-sm mt-1">Start a conversation with {chatAgent === 'pip' ? 'Pip' : 'Bubo'}</p>
+                      </div>
+                    </div>
+                  )}
+                  {chatMessages.map(msg => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.from_agent ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div
+                        className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
+                          msg.from_agent
+                            ? 'bg-[var(--surface-elev)] text-[var(--text-primary)]'
+                            : 'bg-[var(--accent)] text-white'
+                        }`}
+                      >
+                        {msg.from_agent && (
+                          <p className="text-xs font-medium mb-1 opacity-70">
+                            {msg.from_agent === 'pip' ? '🐦 Pip' : '🦉 Bubo'}
+                          </p>
+                        )}
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        <p className={`text-[10px] mt-1 ${msg.from_agent ? 'text-[var(--text-muted)]' : 'text-white/60'}`}>
+                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {!msg.from_agent && msg.status === 'pending' && ' • Pending'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Input */}
+                <form onSubmit={sendChatMessage} className="p-4 border-t border-[var(--border-subtle)]">
+                  <div className="flex gap-3">
+                    <input
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      placeholder={`Message ${chatAgent === 'pip' ? 'Pip' : 'Bubo'}...`}
+                      className="input-base flex-1"
+                      disabled={chatSending}
+                    />
+                    <button
+                      type="submit"
+                      disabled={chatSending || !chatInput.trim()}
+                      className="btn-primary px-6 flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {chatSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                      Send
+                    </button>
+                  </div>
+                </form>
               </div>
             </>
           )}
