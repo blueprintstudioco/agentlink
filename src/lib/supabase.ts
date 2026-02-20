@@ -1,11 +1,25 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createBrowserClient } from '@supabase/ssr';
 
+// Singleton browser client to maintain session across realtime
+let browserClient: ReturnType<typeof createBrowserClient> | null = null;
+
 // Browser client for client components
 export function createSupabaseBrowserClient() {
+  if (browserClient) return browserClient;
+  
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+  
+  browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
+    }
+  });
+  
+  return browserClient;
 }
 
 // Server-side Supabase client with service role (bypasses RLS)
