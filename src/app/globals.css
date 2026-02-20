@@ -211,3 +211,119 @@ body {
   border-radius: 999px;
   background: rgba(148, 163, 184, 0.3);
 }
+
+/* ======== OFFICE ANIMATIONS ======== */
+
+/* Typing animation - hands bobbing up/down */
+@keyframes typing {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-2px); }
+  50% { transform: translateY(0); }
+  75% { transform: translateY(-1px); }
+}
+
+/* Thinking animation - thought bubble floating */
+@keyframes thinking {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.9; }
+  50% { transform: translateY(-4px) scale(1.05); opacity: 1; }
+}
+
+/* Monitor screen glow pulsing */
+@keyframes glow {
+  0%, 100% { 
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.5), inset 0 0 6px rgba(59, 130, 246, 0.3);
+    background: linear-gradient(180deg, #1e3a5f 0%, #1e40af 100%);
+  }
+  50% { 
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.8), inset 0 0 10px rgba(59, 130, 246, 0.5);
+    background: linear-gradient(180deg, #2563eb 0%, #3b82f6 100%);
+  }
+}
+
+/* Coffee cup steam rising */
+@keyframes steam {
+  0% { transform: translateY(0) scaleX(1); opacity: 0.6; }
+  50% { transform: translateY(-6px) scaleX(1.2); opacity: 0.3; }
+  100% { transform: translateY(-12px) scaleX(0.8); opacity: 0; }
+}
+
+/* Idle bobbing animation */
+@keyframes idle-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* Coffee sipping animation */
+@keyframes sip {
+  0%, 70%, 100% { transform: rotate(0deg) translateY(0); }
+  80% { transform: rotate(-15deg) translateY(-2px); }
+  90% { transform: rotate(-10deg) translateY(-1px); }
+}
+
+/* Blink animation for eyes */
+@keyframes blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+/* Status indicator pulse */
+@keyframes status-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+  50% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+}
+
+/* Sub-agent work indicator */
+@keyframes work-indicator {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Plant sway */
+@keyframes plant-sway {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+/* Activity feed slide in */
+@keyframes slide-in {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.animate-typing { animation: typing 0.4s ease-in-out infinite; }
+.animate-thinking { animation: thinking 2s ease-in-out infinite; }
+.animate-glow { animation: glow 2s ease-in-out infinite; }
+.animate-steam { animation: steam 2s ease-out infinite; }
+.animate-idle-bob { animation: idle-bob 3s ease-in-out infinite; }
+.animate-sip { animation: sip 4s ease-in-out infinite; }
+.animate-blink { animation: blink 4s ease-in-out infinite; }
+.animate-status-pulse { animation: status-pulse 2s ease-in-out infinite; }
+.animate-plant-sway { animation: plant-sway 4s ease-in-out infinite; }
+.animate-slide-in { animation: slide-in 0.3s ease-out forwards; }
+
+/* ======== OFFICE FLOOR STYLES ======== */
+
+.office-floor {
+  background: 
+    repeating-linear-gradient(
+      90deg,
+      rgba(139, 92, 46, 0.1) 0px,
+      rgba(139, 92, 46, 0.1) 2px,
+      transparent 2px,
+      transparent 20px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(139, 92, 46, 0.05) 0px,
+      rgba(139, 92, 46, 0.05) 2px,
+      transparent 2px,
+      transparent 20px
+    ),
+    linear-gradient(180deg, #1a1520 0%, #15121a 100%);
+}
+
+.pixel-shadow {
+  box-shadow: 
+    2px 2px 0 rgba(0, 0, 0, 0.3),
+    4px 4px 0 rgba(0, 0, 0, 0.15);
+}

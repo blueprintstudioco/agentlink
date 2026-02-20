@@ -22,68 +22,513 @@ interface Approval { id: string; type: string; content: string; recipient: strin
 interface Project { id: string; name: string; description: string | null; status: string; due_date: string | null; }
 interface ChatMessage { id: string; from_agent: string | null; to_agent: string; content: string; status: string; created_at: string; }
 
-// Pixel Art Components for Office
-function OwlSprite({ working }: { working: boolean }) {
+// ====== PIXEL ART OFFICE COMPONENTS ======
+
+// Bubo the Owl - Main agent sprite (larger, more detailed)
+function OwlSprite({ working, inBreakRoom }: { working: boolean; inBreakRoom?: boolean }) {
   return (
-    <div className="relative">
-      <div className="w-8 h-8 relative">
-        {/* Owl body */}
-        <div className="absolute inset-0 bg-amber-700 rounded-full" />
-        {/* Eyes */}
-        <div className="absolute top-1 left-1 w-2 h-2 bg-yellow-300 rounded-full" />
-        <div className="absolute top-1 right-1 w-2 h-2 bg-yellow-300 rounded-full" />
-        {/* Pupils */}
-        <div className="absolute top-1.5 left-1.5 w-1 h-1 bg-black rounded-full" />
-        <div className="absolute top-1.5 right-1.5 w-1 h-1 bg-black rounded-full" />
-        {/* Beak */}
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[3px] border-r-[3px] border-t-[4px] border-l-transparent border-r-transparent border-t-orange-400" />
+    <div className={`relative ${inBreakRoom ? 'animate-idle-bob' : ''}`}>
+      <div className="w-12 h-14 relative">
         {/* Ear tufts */}
-        <div className="absolute -top-1 left-0 w-2 h-2 bg-amber-800 rounded-tl-full" />
-        <div className="absolute -top-1 right-0 w-2 h-2 bg-amber-800 rounded-tr-full" />
+        <div className="absolute -top-2 left-0 w-4 h-4 bg-amber-800 rounded-tl-full transform -rotate-12" />
+        <div className="absolute -top-2 right-0 w-4 h-4 bg-amber-800 rounded-tr-full transform rotate-12" />
+        {/* Owl body */}
+        <div className="absolute top-1 left-0 right-0 h-11 bg-gradient-to-b from-amber-600 to-amber-800 rounded-full" />
+        {/* Belly patch */}
+        <div className="absolute top-5 left-1/2 -translate-x-1/2 w-6 h-6 bg-amber-200/40 rounded-full" />
+        {/* Eye whites */}
+        <div className="absolute top-3 left-1 w-4 h-4 bg-yellow-200 rounded-full animate-blink" />
+        <div className="absolute top-3 right-1 w-4 h-4 bg-yellow-200 rounded-full animate-blink" />
+        {/* Pupils */}
+        <div className={`absolute top-4 left-2 w-2 h-2 bg-black rounded-full transition-all ${working ? '' : 'translate-x-0.5'}`} />
+        <div className={`absolute top-4 right-2 w-2 h-2 bg-black rounded-full transition-all ${working ? '' : '-translate-x-0.5'}`} />
+        {/* Eye shine */}
+        <div className="absolute top-3.5 left-1.5 w-1 h-1 bg-white rounded-full" />
+        <div className="absolute top-3.5 right-3.5 w-1 h-1 bg-white rounded-full" />
+        {/* Beak */}
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-t-[7px] border-l-transparent border-r-transparent border-t-orange-500" />
+        {/* Hands/wings for typing */}
+        {working && (
+          <>
+            <div className="absolute bottom-2 -left-1 w-3 h-2 bg-amber-700 rounded-full animate-typing" style={{ animationDelay: '0ms' }} />
+            <div className="absolute bottom-2 -right-1 w-3 h-2 bg-amber-700 rounded-full animate-typing" style={{ animationDelay: '200ms' }} />
+          </>
+        )}
       </div>
       {/* Status indicator */}
-      <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-[var(--surface)] ${working ? 'bg-green-500' : 'bg-gray-500'}`} />
+      <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-[var(--surface)] ${working ? 'bg-green-500 animate-status-pulse' : 'bg-gray-500'}`} />
+      {/* Thinking bubble when working */}
+      {working && (
+        <div className="absolute -top-6 -right-4 animate-thinking">
+          <div className="w-6 h-6 bg-white/90 rounded-full flex items-center justify-center text-xs">💭</div>
+          <div className="absolute -bottom-1 left-1 w-2 h-2 bg-white/90 rounded-full" />
+          <div className="absolute -bottom-2 left-0 w-1.5 h-1.5 bg-white/70 rounded-full" />
+        </div>
+      )}
     </div>
   );
 }
 
-function BirdSprite({ working }: { working: boolean }) {
+// Pip the Bird - Secondary agent sprite
+function BirdSprite({ working, inBreakRoom }: { working: boolean; inBreakRoom?: boolean }) {
   return (
-    <div className="relative">
-      <div className="w-6 h-6 relative">
+    <div className={`relative ${inBreakRoom ? 'animate-idle-bob' : ''}`}>
+      <div className="w-9 h-10 relative">
         {/* Bird body */}
-        <div className="absolute inset-0 bg-sky-400 rounded-full" />
+        <div className="absolute top-2 inset-x-0 h-8 bg-gradient-to-b from-sky-300 to-sky-500 rounded-full" />
+        {/* Head tuft */}
+        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-sky-400 rounded-full" />
         {/* Eye */}
-        <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-white rounded-full" />
-        <div className="absolute top-1.5 right-1 w-0.5 h-0.5 bg-black rounded-full" />
+        <div className="absolute top-4 right-1 w-3 h-3 bg-white rounded-full animate-blink" />
+        <div className="absolute top-4.5 right-1.5 w-1.5 h-1.5 bg-black rounded-full" />
+        <div className="absolute top-4 right-1.5 w-1 h-1 bg-white rounded-full" />
         {/* Beak */}
-        <div className="absolute top-2 -right-1 w-0 h-0 border-t-[3px] border-b-[3px] border-l-[4px] border-t-transparent border-b-transparent border-l-orange-400" />
+        <div className="absolute top-5 -right-2 w-0 h-0 border-t-[4px] border-b-[4px] border-l-[6px] border-t-transparent border-b-transparent border-l-orange-400" />
         {/* Wing */}
-        <div className="absolute bottom-0 left-0 w-3 h-2 bg-sky-500 rounded-bl-full" />
+        <div className={`absolute bottom-1 left-0 w-4 h-4 bg-sky-600 rounded-bl-full rounded-tr-full ${working ? 'animate-typing' : ''}`} />
+        {/* Tail */}
+        <div className="absolute bottom-0 -left-2 w-4 h-2 bg-sky-500 rounded-l-full transform -rotate-12" />
       </div>
-      <div className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-[var(--surface)] ${working ? 'bg-green-500' : 'bg-gray-500'}`} />
+      <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-[var(--surface)] ${working ? 'bg-green-500 animate-status-pulse' : 'bg-gray-500'}`} />
     </div>
   );
 }
 
-function Desk() {
+// Generic sub-agent sprite (colored circle with face)
+function SubAgentSprite({ working, color, emoji }: { working: boolean; color: string; emoji?: string }) {
+  const bgColor = {
+    purple: 'from-purple-400 to-purple-600',
+    pink: 'from-pink-400 to-pink-600',
+    green: 'from-emerald-400 to-emerald-600',
+    blue: 'from-blue-400 to-blue-600',
+    orange: 'from-orange-400 to-orange-600',
+  }[color] || 'from-gray-400 to-gray-600';
+
   return (
     <div className="relative">
-      {/* Desk surface */}
-      <div className="w-16 h-3 bg-amber-900 rounded-t" />
-      {/* Monitor */}
-      <div className="absolute -top-6 left-1/2 -translate-x-1/2">
-        <div className="w-8 h-6 bg-gray-800 rounded-t border-2 border-gray-700" />
-        <div className="w-6 h-5 bg-blue-900 mx-auto -mt-5 rounded-sm" />
-        <div className="w-2 h-1 bg-gray-700 mx-auto" />
-        <div className="w-4 h-0.5 bg-gray-700 mx-auto" />
+      <div className={`w-8 h-8 rounded-full bg-gradient-to-b ${bgColor} relative flex items-center justify-center`}>
+        {emoji ? (
+          <span className="text-sm">{emoji}</span>
+        ) : (
+          <>
+            {/* Eyes */}
+            <div className="absolute top-2 left-1.5 w-1.5 h-1.5 bg-white rounded-full animate-blink" />
+            <div className="absolute top-2 right-1.5 w-1.5 h-1.5 bg-white rounded-full animate-blink" />
+            {/* Mouth */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-1 bg-white/50 rounded-full" />
+          </>
+        )}
+        {working && (
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 flex gap-0.5 justify-center">
+            <div className="w-1 h-1 bg-white/60 rounded-full animate-typing" style={{ animationDelay: '0ms' }} />
+            <div className="w-1 h-1 bg-white/60 rounded-full animate-typing" style={{ animationDelay: '100ms' }} />
+            <div className="w-1 h-1 bg-white/60 rounded-full animate-typing" style={{ animationDelay: '200ms' }} />
+          </div>
+        )}
       </div>
+      <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[var(--surface)] ${working ? 'bg-green-500' : 'bg-gray-500'}`} />
+    </div>
+  );
+}
+
+// Main desk with monitor (larger)
+function MainDesk({ working }: { working: boolean }) {
+  return (
+    <div className="relative pixel-shadow">
+      {/* Monitor */}
+      <div className="absolute -top-10 left-1/2 -translate-x-1/2">
+        <div className="w-14 h-10 bg-gray-800 rounded-t-lg border-2 border-gray-700">
+          <div className={`w-11 h-7 mx-auto mt-1 rounded-sm ${working ? 'animate-glow' : 'bg-gray-900'}`} />
+        </div>
+        <div className="w-4 h-2 bg-gray-700 mx-auto" />
+        <div className="w-8 h-1 bg-gray-700 mx-auto rounded-b" />
+      </div>
+      {/* Keyboard */}
+      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-10 h-2 bg-gray-700 rounded-sm" />
+      {/* Desk surface */}
+      <div className="w-24 h-4 bg-gradient-to-b from-amber-700 to-amber-900 rounded-t" />
+      {/* Desk legs */}
+      <div className="flex justify-between px-2">
+        <div className="w-2 h-6 bg-amber-800" />
+        <div className="w-2 h-6 bg-amber-800" />
+      </div>
+    </div>
+  );
+}
+
+// Smaller sub-agent desk
+function SmallDesk({ working }: { working: boolean }) {
+  return (
+    <div className="relative">
+      {/* Small monitor */}
+      <div className="absolute -top-6 left-1/2 -translate-x-1/2">
+        <div className="w-8 h-6 bg-gray-800 rounded-t border border-gray-700">
+          <div className={`w-6 h-4 mx-auto mt-0.5 rounded-sm ${working ? 'animate-glow' : 'bg-gray-900'}`} />
+        </div>
+        <div className="w-2 h-1 bg-gray-700 mx-auto" />
+      </div>
+      {/* Desk surface */}
+      <div className="w-14 h-2 bg-gradient-to-b from-amber-700 to-amber-900 rounded-t" />
       {/* Desk legs */}
       <div className="flex justify-between px-1">
         <div className="w-1 h-4 bg-amber-800" />
         <div className="w-1 h-4 bg-amber-800" />
       </div>
     </div>
+  );
+}
+
+// Break room furniture
+function Couch() {
+  return (
+    <div className="relative pixel-shadow">
+      {/* Back rest */}
+      <div className="w-28 h-6 bg-gradient-to-b from-gray-600 to-gray-700 rounded-t-lg" />
+      {/* Seat cushions */}
+      <div className="flex">
+        <div className="w-14 h-5 bg-gray-600 rounded-bl-lg border-r border-gray-700" />
+        <div className="w-14 h-5 bg-gray-600 rounded-br-lg" />
+      </div>
+      {/* Arm rests */}
+      <div className="absolute top-2 -left-2 w-2 h-9 bg-gray-700 rounded-l" />
+      <div className="absolute top-2 -right-2 w-2 h-9 bg-gray-700 rounded-r" />
+    </div>
+  );
+}
+
+function CoffeeTable() {
+  return (
+    <div className="relative pixel-shadow">
+      {/* Table top */}
+      <div className="w-20 h-3 bg-gradient-to-b from-amber-800 to-amber-900 rounded" />
+      {/* Coffee mugs */}
+      <div className="absolute -top-3 left-3">
+        <div className="w-3 h-3 bg-gray-100 rounded-b" />
+        <div className="absolute -top-1 left-0 w-3 flex justify-center">
+          <div className="w-2 h-2 bg-white/40 rounded-full animate-steam" />
+        </div>
+      </div>
+      <div className="absolute -top-3 right-3">
+        <div className="w-3 h-3 bg-amber-100 rounded-b" />
+        <div className="absolute -top-1 left-0 w-3 flex justify-center">
+          <div className="w-2 h-2 bg-white/30 rounded-full animate-steam" style={{ animationDelay: '0.5s' }} />
+        </div>
+      </div>
+      {/* Table legs */}
+      <div className="flex justify-between px-3">
+        <div className="w-1 h-3 bg-amber-800" />
+        <div className="w-1 h-3 bg-amber-800" />
+      </div>
+    </div>
+  );
+}
+
+function Plant({ size = 'large' }: { size?: 'large' | 'small' }) {
+  const isLarge = size === 'large';
+  return (
+    <div className={`relative ${isLarge ? 'animate-plant-sway' : ''}`} style={{ transformOrigin: 'bottom center' }}>
+      {/* Pot */}
+      <div className={`${isLarge ? 'w-8 h-6' : 'w-5 h-4'} bg-gradient-to-b from-orange-700 to-orange-900 rounded-b-lg mx-auto`} />
+      {/* Leaves */}
+      <div className={`absolute ${isLarge ? '-top-6 left-1/2 -translate-x-1/2' : '-top-4 left-1/2 -translate-x-1/2'}`}>
+        <div className={`${isLarge ? 'w-4 h-6' : 'w-2 h-4'} bg-green-600 rounded-full transform -rotate-12 absolute -left-3`} />
+        <div className={`${isLarge ? 'w-4 h-7' : 'w-2 h-5'} bg-green-500 rounded-full absolute left-0`} />
+        <div className={`${isLarge ? 'w-4 h-6' : 'w-2 h-4'} bg-green-600 rounded-full transform rotate-12 absolute left-3`} />
+      </div>
+    </div>
+  );
+}
+
+function CoffeeCup({ hasSteam = true }: { hasSteam?: boolean }) {
+  return (
+    <div className="relative">
+      <div className="w-4 h-5 bg-white rounded-b-lg">
+        <div className="absolute top-1 right-0 w-2 h-3 border-2 border-white rounded-r-full translate-x-1" />
+      </div>
+      {hasSteam && (
+        <div className="absolute -top-2 left-1/2 -translate-x-1/2 flex gap-0.5">
+          <div className="w-1 h-3 bg-white/30 rounded-full animate-steam" />
+          <div className="w-1 h-3 bg-white/20 rounded-full animate-steam" style={{ animationDelay: '0.3s' }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ====== OFFICE VIEW COMPONENT ======
+function OfficeView({ agents, activity: initialActivity }: { agents: Agent[]; activity: Activity[] }) {
+  const [liveActivity, setLiveActivity] = useState<Activity[]>(initialActivity);
+  
+  // Poll /api/activity every 5 seconds
+  useEffect(() => {
+    const pollActivity = async () => {
+      try {
+        const res = await fetch('/api/activity');
+        const data = await res.json();
+        if (data.activities) {
+          setLiveActivity(data.activities);
+        }
+      } catch (e) {
+        console.error('Activity poll error:', e);
+      }
+    };
+    
+    const interval = setInterval(pollActivity, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Find main agents
+  const bubo = agents.find(a => a.name.toLowerCase() === 'bubo');
+  const pip = agents.find(a => a.name.toLowerCase() === 'pip');
+  const subAgents = agents.filter(a => 
+    a.name.toLowerCase() !== 'bubo' && a.name.toLowerCase() !== 'pip'
+  );
+
+  // Determine positions based on status
+  const buboWorking = bubo?.status === 'online';
+  const pipWorking = pip?.status === 'online';
+
+  // Sub-agent colors for variety
+  const subAgentColors = ['purple', 'pink', 'green', 'blue', 'orange'];
+
+  // Format relative time
+  const formatRelativeTime = (dateStr: string) => {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Get agent emoji
+  const getAgentEmoji = (agentName: string | null) => {
+    if (!agentName) return '🤖';
+    const name = agentName.toLowerCase();
+    if (name === 'bubo') return '🦉';
+    if (name === 'pip') return '🐦';
+    const agent = agents.find(a => a.name.toLowerCase() === name);
+    return agent?.avatar_emoji || '🤖';
+  };
+
+  return (
+    <>
+      <header>
+        <h1 className="text-3xl font-bold">The Office</h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">AI team headquarters — live view</p>
+      </header>
+
+      <div className="grid grid-cols-4 gap-6">
+        <div className="col-span-3 surface-card overflow-hidden">
+          {/* Office Floor */}
+          <div className="office-floor relative p-6 min-h-[500px]">
+            {/* Status Legend */}
+            <div className="absolute top-4 right-4 flex gap-4 text-xs bg-black/40 rounded-lg px-3 py-1.5">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-status-pulse" /> Working
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-gray-500" /> Idle
+              </span>
+            </div>
+
+            {/* === LAYOUT: Left - Break Room | Center - Main Desks | Right - Sub-agent Desks === */}
+            <div className="flex h-full min-h-[450px]">
+              
+              {/* LEFT: Break Room Area */}
+              <div className="w-1/4 flex flex-col items-center justify-center gap-6 border-r border-white/5 pr-6">
+                <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-2">☕ Break Room</p>
+                
+                {/* Couch with idle agents */}
+                <div className="relative">
+                  <Couch />
+                  {/* Place idle agents on couch */}
+                  <div className="absolute -top-8 left-4 flex gap-4">
+                    {!buboWorking && bubo && (
+                      <div className="flex flex-col items-center">
+                        <OwlSprite working={false} inBreakRoom />
+                        <span className="text-[10px] text-[var(--text-muted)] mt-1">Bubo</span>
+                      </div>
+                    )}
+                    {!pipWorking && pip && (
+                      <div className="flex flex-col items-center">
+                        <BirdSprite working={false} inBreakRoom />
+                        <span className="text-[10px] text-[var(--text-muted)] mt-1">Pip</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Coffee table */}
+                <CoffeeTable />
+
+                {/* Plant */}
+                <div className="mt-4">
+                  <Plant size="large" />
+                </div>
+              </div>
+
+              {/* CENTER: Main Agent Desks */}
+              <div className="w-2/4 flex flex-col items-center justify-center gap-8 px-8">
+                <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider">🖥️ Main Workspace</p>
+                
+                {/* Bubo's Desk (Front, larger) */}
+                {bubo && (
+                  <div className="flex flex-col items-center">
+                    {buboWorking && (
+                      <div className="mb-4">
+                        <OwlSprite working={true} />
+                      </div>
+                    )}
+                    {!buboWorking && <div className="h-16" />}
+                    <MainDesk working={buboWorking} />
+                    <p className="mt-3 text-sm font-medium flex items-center gap-2">
+                      🦉 {bubo.name}
+                      <span className={`text-xs ${buboWorking ? 'text-green-400' : 'text-gray-500'}`}>
+                        {buboWorking ? '• Working' : '• On break'}
+                      </span>
+                    </p>
+                  </div>
+                )}
+
+                {/* Pip's Desk (Behind Bubo) */}
+                {pip && (
+                  <div className="flex flex-col items-center -mt-2">
+                    {pipWorking && (
+                      <div className="mb-4">
+                        <BirdSprite working={true} />
+                      </div>
+                    )}
+                    {!pipWorking && <div className="h-12" />}
+                    <MainDesk working={pipWorking} />
+                    <p className="mt-3 text-sm font-medium flex items-center gap-2">
+                      🐦 {pip.name}
+                      <span className={`text-xs ${pipWorking ? 'text-green-400' : 'text-gray-500'}`}>
+                        {pipWorking ? '• Working' : '• On break'}
+                      </span>
+                    </p>
+                  </div>
+                )}
+
+                {/* Decorative plants */}
+                <div className="flex gap-20 mt-4">
+                  <Plant size="small" />
+                  <Plant size="small" />
+                </div>
+              </div>
+
+              {/* RIGHT: Sub-Agent Desks */}
+              <div className="w-1/4 flex flex-col items-center justify-center border-l border-white/5 pl-6">
+                <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-4">🤖 Sub-Agents</p>
+                
+                <div className="flex flex-col gap-6">
+                  {subAgents.length === 0 ? (
+                    // Empty desk placeholders
+                    <>
+                      {[0, 1, 2, 3, 4].map(i => (
+                        <div key={i} className="flex flex-col items-center opacity-30">
+                          <div className="h-8 mb-2" /> {/* Empty space */}
+                          <SmallDesk working={false} />
+                          <p className="mt-2 text-[10px] text-[var(--text-muted)]">Empty</p>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    // Actual sub-agents
+                    <>
+                      {subAgents.slice(0, 5).map((agent, i) => {
+                        const isWorking = agent.status === 'online';
+                        return (
+                          <div key={agent.id} className="flex flex-col items-center">
+                            {isWorking ? (
+                              <div className="mb-2">
+                                <SubAgentSprite 
+                                  working={true} 
+                                  color={subAgentColors[i % subAgentColors.length]}
+                                  emoji={agent.avatar_emoji || undefined}
+                                />
+                              </div>
+                            ) : (
+                              <div className="h-8 mb-2" />
+                            )}
+                            <SmallDesk working={isWorking} />
+                            <p className="mt-2 text-[10px] text-center">
+                              {agent.avatar_emoji || '🤖'} {agent.name}
+                            </p>
+                          </div>
+                        );
+                      })}
+                      {/* Fill remaining slots with empty desks */}
+                      {Array.from({ length: Math.max(0, 5 - subAgents.length) }).map((_, i) => (
+                        <div key={`empty-${i}`} className="flex flex-col items-center opacity-30">
+                          <div className="h-8 mb-2" />
+                          <SmallDesk working={false} />
+                          <p className="mt-2 text-[10px] text-[var(--text-muted)]">Empty</p>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Activity Sidebar */}
+        <div className="surface-card p-4 flex flex-col">
+          <h3 className="section-title flex items-center gap-2">
+            <Activity size={16} className="text-[var(--accent)]" />
+            Live Activity
+          </h3>
+          <p className="section-subtitle mb-4">Real-time updates</p>
+          
+          <div className="flex-1 overflow-auto">
+            {liveActivity.length === 0 ? (
+              <div className="empty-state text-sm">
+                <Activity size={24} className="mx-auto mb-2 opacity-50" />
+                No recent activity
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {liveActivity.slice(0, 10).map((a, i) => (
+                  <div 
+                    key={a.id} 
+                    className="text-xs p-2 rounded-lg bg-[var(--surface-elev)] animate-slide-in"
+                    style={{ animationDelay: `${i * 50}ms` }}
+                  >
+                    <div className="flex items-start gap-2">
+                      <span className="text-base">{getAgentEmoji(a.agent)}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-[var(--text-primary)]">
+                          {a.agent || 'System'}
+                        </p>
+                        <p className="text-[var(--text-secondary)] line-clamp-2 mt-0.5">
+                          {a.summary}
+                        </p>
+                        <p className="text-[var(--text-muted)] mt-1">
+                          {formatRelativeTime(a.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Activity count */}
+          <div className="mt-4 pt-3 border-t border-[var(--border-subtle)]">
+            <p className="text-xs text-[var(--text-muted)] text-center">
+              Showing {Math.min(10, liveActivity.length)} of {liveActivity.length} activities
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -761,77 +1206,7 @@ export default function MissionControl() {
 
           {/* OFFICE */}
           {activeTab === 'office' && (
-            <>
-              <header>
-                <h1 className="text-3xl font-bold">The Office</h1>
-                <p className="text-sm text-[var(--text-secondary)] mt-1">AI team headquarters — live view</p>
-              </header>
-
-              <div className="grid grid-cols-4 gap-6">
-                <div className="col-span-3 surface-card overflow-hidden">
-                  {/* Office Floor */}
-                  <div className="relative p-8" style={{ background: 'repeating-conic-gradient(#1a1a2e 0% 25%, #12121a 0% 50%) 50% / 40px 40px' }}>
-                    {/* Status Legend */}
-                    <div className="absolute top-4 right-4 flex gap-4 text-xs">
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Working</span>
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-500" /> Idle</span>
-                    </div>
-
-                    {/* Office Layout */}
-                    <div className="min-h-[400px] flex flex-col items-center justify-center gap-12">
-                      {/* Bubo's desk (main, center) */}
-                      {bubo && (
-                        <div className="flex flex-col items-center">
-                          <div className="mb-2">
-                            <OwlSprite working={bubo.status === 'online'} />
-                          </div>
-                          <Desk />
-                          <p className="mt-2 text-sm font-medium">{bubo.name}</p>
-                        </div>
-                      )}
-
-                      {/* Sub-agent desks */}
-                      <div className="flex gap-16">
-                        {subAgents.map(agent => (
-                          <div key={agent.id} className="flex flex-col items-center">
-                            <div className="mb-2">
-                              <BirdSprite working={agent.status === 'online'} />
-                            </div>
-                            <Desk />
-                            <p className="mt-2 text-xs">{agent.name}</p>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Decorative elements */}
-                      <div className="absolute bottom-4 left-4 w-12 h-12 rounded-full bg-green-800/50" /> {/* Plant */}
-                      <div className="absolute bottom-4 right-4 w-12 h-12 rounded-full bg-green-800/50" /> {/* Plant */}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Live Activity Sidebar */}
-                <div className="surface-card p-4">
-                  <h3 className="section-title flex items-center gap-2">
-                    <Activity size={16} className="text-[var(--accent)]" />
-                    Live Activity
-                  </h3>
-                  <p className="section-subtitle mb-4">Last hour</p>
-                  {activity.length === 0 ? (
-                    <div className="empty-state text-sm">No recent activity</div>
-                  ) : (
-                    <div className="space-y-3">
-                      {activity.slice(0, 8).map(a => (
-                        <div key={a.id} className="text-xs">
-                          <p className="text-[var(--text-secondary)] line-clamp-2">{a.summary}</p>
-                          <p className="text-[var(--text-muted)]">{new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
+            <OfficeView agents={agents} activity={activity} />
           )}
 
         </div>
