@@ -337,35 +337,7 @@ export default function MissionControl() {
 
         {/* Calendar Tab */}
         {activeTab === 'calendar' && (
-          <section>
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-6">Scheduled Tasks & Cron Jobs</h2>
-            {cronJobs.length === 0 ? (
-              <div className="text-gray-500 text-center py-12 bg-gray-900 rounded-xl border border-gray-800">
-                <div className="text-4xl mb-4">📅</div>
-                <div>No scheduled jobs yet</div>
-                <div className="text-sm text-gray-600 mt-2">Cron jobs will appear here</div>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {cronJobs.map((job) => (
-                  <div key={job.id} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-lg">{job.name}</h3>
-                      <span className={`text-xs px-2 py-1 rounded ${job.status === 'active' ? 'bg-green-600' : 'bg-gray-700'}`}>
-                        {job.status}
-                      </span>
-                    </div>
-                    <p className="text-gray-400 text-sm mb-3">{job.description}</p>
-                    <div className="flex gap-6 text-xs text-gray-500">
-                      <div><span className="text-gray-600">Schedule:</span> {job.schedule}</div>
-                      {job.next_run && <div><span className="text-gray-600">Next:</span> {new Date(job.next_run).toLocaleString()}</div>}
-                      {job.last_run && <div><span className="text-gray-600">Last:</span> {new Date(job.last_run).toLocaleString()}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          <CronVisualizer />
         )}
 
         {/* Memory Tab */}
