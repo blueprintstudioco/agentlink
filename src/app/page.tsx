@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase';
 import CronVisualizer from '@/components/CronVisualizer';
-import MemoryBrowser from '@/components/MemoryBrowser';
 
 // Alex's hardcoded user ID - single user app
 const USER_ID = '9452a23f-a139-42cd-83e4-732f188a07ff';
