@@ -18,16 +18,22 @@ async function ensureTable() {
 
 // GET - fetch messages for a conversation
 export async function GET(request: NextRequest) {
-  const agent = request.nextUrl.searchParams.get('agent') || 'pip';
-  const limit = parseInt(request.nextUrl.searchParams.get('limit') || '50');
+  const agent = request.nextUrl.searchParams.get('agent') || 'team';
+  const limit = parseInt(request.nextUrl.searchParams.get('limit') || '100');
   
-  const { data, error } = await supabase
+  let query = supabase
     .from('mc_messages')
     .select('*')
     .eq('user_id', USER_ID)
-    .or(`to_agent.eq.${agent},from_agent.eq.${agent}`)
     .order('created_at', { ascending: true })
     .limit(limit);
+  
+  // For team chat, show all messages. For individual agents, filter.
+  if (agent !== 'team') {
+    query = query.or(`to_agent.eq.${agent},from_agent.eq.${agent}`);
+  }
+  
+  const { data, error } = await query;
 
   if (error) {
     // Table might not exist

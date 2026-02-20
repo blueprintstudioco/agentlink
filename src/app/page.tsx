@@ -121,7 +121,7 @@ export default function MissionControl() {
   const [newTask, setNewTask] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
-  const [chatAgent, setChatAgent] = useState<'pip' | 'bubo'>('pip');
+  const [chatAgent, setChatAgent] = useState<'team' | 'pip' | 'bubo'>('team');
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState('');
 
@@ -150,8 +150,8 @@ export default function MissionControl() {
         filter: `user_id=eq.${USER_ID}`
       }, (payload) => {
         const newMsg = payload.new as ChatMessage;
-        // Only add if it's for our current agent conversation
-        if (newMsg.to_agent === chatAgent || newMsg.from_agent === chatAgent) {
+        // For team chat, show all messages. For individual agents, filter.
+        if (chatAgent === 'team' || newMsg.to_agent === chatAgent || newMsg.from_agent === chatAgent) {
           setChatMessages(prev => [...prev, newMsg]);
         }
       })
@@ -468,7 +468,7 @@ export default function MissionControl() {
                   <p className="text-sm text-[var(--text-secondary)] mt-1">Live conversation with your agents</p>
                 </div>
                 <div className="flex gap-2">
-                  {(['pip', 'bubo'] as const).map(agent => (
+                  {(['team', 'bubo', 'pip'] as const).map(agent => (
                     <button
                       key={agent}
                       onClick={() => setChatAgent(agent)}
@@ -478,7 +478,7 @@ export default function MissionControl() {
                           : 'bg-[var(--surface-elev)] text-[var(--text-secondary)] hover:bg-[var(--surface-elev)]/80'
                       }`}
                     >
-                      {agent === 'pip' ? '🐦 Pip' : '🦉 Bubo'}
+                      {agent === 'team' ? '👥 Team' : agent === 'pip' ? '🐦 Pip' : '🦉 Bubo'}
                     </button>
                   ))}
                 </div>
@@ -497,7 +497,7 @@ export default function MissionControl() {
                       <div className="text-center">
                         <MessageCircle size={48} className="mx-auto mb-4 opacity-50" />
                         <p>No messages yet</p>
-                        <p className="text-sm mt-1">Start a conversation with {chatAgent === 'pip' ? 'Pip' : 'Bubo'}</p>
+                        <p className="text-sm mt-1">Start a conversation with {chatAgent === 'team' ? 'the team' : chatAgent === 'pip' ? 'Pip' : 'Bubo'}</p>
                       </div>
                     </div>
                   )}
@@ -534,7 +534,7 @@ export default function MissionControl() {
                     <input
                       value={chatInput}
                       onChange={e => setChatInput(e.target.value)}
-                      placeholder={`Message ${chatAgent === 'pip' ? 'Pip' : 'Bubo'}...`}
+                      placeholder={`Message ${chatAgent === 'team' ? 'the team' : chatAgent === 'pip' ? 'Pip' : 'Bubo'}...`}
                       className="input-base flex-1"
                       disabled={chatSending}
                     />
