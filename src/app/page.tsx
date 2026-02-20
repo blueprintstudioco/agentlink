@@ -11,20 +11,6 @@ import {
 const USER_ID = '9452a23f-a139-42cd-83e4-732f188a07ff';
 type TabType = 'dashboard' | 'approvals' | 'projects' | 'calendar' | 'memory' | 'team' | 'office' | 'chat';
 
-const AUTH_COOKIE = 'mc_auth';
-const CORRECT_PASSWORD = 'brushworks2026';
-
-function isAuthed(): boolean {
-  if (typeof window === 'undefined') return false;
-  return document.cookie.includes(`${AUTH_COOKIE}=1`);
-}
-function setAuth() {
-  document.cookie = `${AUTH_COOKIE}=1; path=/; max-age=${60 * 60 * 24 * 30}`;
-}
-function clearAuth() {
-  document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0`;
-}
-
 interface Task { id: string; title: string; status: string; assigned_agent: string | null; }
 interface QuickActionData { id: string; name: string; description: string | null; icon: string | null; }
 interface CronJob { id: string; name: string; schedule: string; next_run: string | null; status: string; description: string | null; }
@@ -102,9 +88,6 @@ function Desk() {
 }
 
 export default function MissionControl() {
-  const [authed, setAuthedState] = useState<boolean | null>(null);
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [actions, setActions] = useState<QuickActionData[]>([]);
@@ -128,15 +111,14 @@ export default function MissionControl() {
 
   const supabase = createSupabaseBrowserClient();
 
-  useEffect(() => { setAuthedState(isAuthed()); }, []);
-  useEffect(() => { if (authed) loadData(); }, [authed]);
+  // Load data on mount (middleware ensures we're authenticated)
+  useEffect(() => { loadData(); }, []);
   useEffect(() => {
-    if (!authed) return;
     if (activeTab === 'memory') loadMemories();
     if (activeTab === 'approvals') loadApprovals();
     if (activeTab === 'projects') loadProjects();
     if (activeTab === 'chat') loadChatMessages();
-  }, [activeTab, authed, chatAgent]);
+  }, [activeTab, chatAgent]);
   
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -147,7 +129,7 @@ export default function MissionControl() {
 
   // Realtime subscription for chat
   useEffect(() => {
-    if (!authed || activeTab !== 'chat') return;
+    if (activeTab !== 'chat') return;
     
     const channel = supabase
       .channel('mc_messages_realtime')
@@ -166,12 +148,11 @@ export default function MissionControl() {
       .subscribe();
     
     return () => { supabase.removeChannel(channel); };
-  }, [authed, activeTab, chatAgent]);
+  }, [activeTab, chatAgent]);
 
-  function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (password === CORRECT_PASSWORD) { setAuth(); setAuthedState(true); setAuthError(''); return; }
-    setAuthError('Wrong password');
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    window.location.href = '/login';
   }
 
   async function loadData() {
@@ -297,29 +278,8 @@ export default function MissionControl() {
   const bubo = agents.find(a => a.name.toLowerCase() === 'bubo');
   const subAgents = agents.filter(a => a.name.toLowerCase() !== 'bubo');
 
-  if (authed === null || loading) {
+  if (loading) {
     return <div className="min-h-screen grid place-items-center text-[var(--text-muted)]">Loading Mission Control...</div>;
-  }
-
-  if (!authed) {
-    return (
-      <div className="min-h-screen grid place-items-center px-4">
-        <div className="surface-card w-full max-w-sm p-8">
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[var(--accent-soft)]">
-              <LayoutDashboard size={28} className="text-[var(--accent)]" />
-            </div>
-            <h1 className="text-2xl font-bold">Mission Control</h1>
-            <p className="mt-2 text-sm text-[var(--text-muted)]">Enter password to continue</p>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" className="input-base" />
-            {authError && <p className="text-sm text-rose-400">{authError}</p>}
-            <button type="submit" className="btn-primary w-full">Enter</button>
-          </form>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -351,7 +311,7 @@ export default function MissionControl() {
           ))}
         </nav>
 
-        <button onClick={() => { clearAuth(); setAuthedState(false); }} className="nav-item text-[var(--text-muted)] mt-4">
+        <button onClick={handleLogout} className="nav-item text-[var(--text-muted)] mt-4">
           <LogOut size={18} />
           <span>Logout</span>
         </button>
