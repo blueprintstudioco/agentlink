@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AgentLink",
-  description: "Connect your AI agents and watch them think",
+  title: "Mission Control",
+  description: "Personal AI command center",
 };
 
 export default function RootLayout({
