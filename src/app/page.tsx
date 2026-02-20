@@ -439,7 +439,7 @@ export default function MissionControl() {
               </div>
 
               <div className="grid grid-cols-3 gap-4">
-                <StatCard label="Active Jobs" value={activeJobs} icon="✓" variant="success" />
+                <StatCard label="Active Jobs" value={activeJobs} icon="✓" />
                 <StatCard label="Total Configured" value={cronJobs.length} icon="📅" />
                 <StatCard label="Next Run" value={cronJobs[0]?.next_run ? new Date(cronJobs[0].next_run).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'} icon="⏰" />
               </div>
