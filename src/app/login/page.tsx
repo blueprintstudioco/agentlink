@@ -34,13 +34,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center px-4">
-      <div className="surface-card w-full max-w-sm p-8">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[var(--accent-soft)]">
-            <LayoutDashboard size={28} className="text-[var(--accent)]" />
+    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center px-4 py-8">
+      <div className="surface-card w-full max-w-sm p-6 sm:p-8">
+        <div className="mb-6 sm:mb-8 text-center">
+          <div className="mx-auto mb-4 grid h-12 w-12 sm:h-14 sm:w-14 place-items-center rounded-2xl bg-[var(--accent-soft)]">
+            <LayoutDashboard size={24} className="sm:hidden text-[var(--accent)]" />
+            <LayoutDashboard size={28} className="hidden sm:block text-[var(--accent)]" />
           </div>
-          <h1 className="text-2xl font-bold">Mission Control</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Mission Control</h1>
           <p className="mt-2 text-sm text-[var(--text-muted)]">Sign in to continue</p>
         </div>
 
@@ -55,6 +56,8 @@ export default function LoginPage() {
                 onChange={e => setEmail(e.target.value)}
                 placeholder="email@example.com"
                 className="input-base pl-10"
+                autoComplete="email"
+                autoCapitalize="none"
                 required
               />
             </div>
@@ -70,6 +73,7 @@ export default function LoginPage() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="input-base pl-10"
+                autoComplete="current-password"
                 required
               />
             </div>
@@ -84,7 +88,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary w-full flex items-center justify-center gap-2"
+            className="btn-primary w-full flex items-center justify-center gap-2 touch-target"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : null}
             {loading ? 'Signing in...' : 'Sign In'}
