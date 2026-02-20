@@ -2,24 +2,42 @@
 
 import { useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase';
+import { 
+  Card, StatCard, Button, Badge, Input, SectionHeader, 
+  EmptyState, ListRow, Avatar, QuickAction, NavItem 
+} from '@/components/ui';
 
-// Alex's hardcoded user ID - single user app
 const USER_ID = '9452a23f-a139-42cd-83e4-732f188a07ff';
-
 type TabType = 'dashboard' | 'calendar' | 'memory' | 'team';
 
+// Simple auth
+const AUTH_COOKIE = 'mc_auth';
+const CORRECT_PASSWORD = 'brushworks2026';
+
+function isAuthed(): boolean {
+  if (typeof window === 'undefined') return false;
+  return document.cookie.includes(`${AUTH_COOKIE}=1`);
+}
+
+function setAuth() {
+  document.cookie = `${AUTH_COOKIE}=1; path=/; max-age=${60 * 60 * 24 * 30}`;
+}
+
+function clearAuth() {
+  document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0`;
+}
+
+// Types
 interface Task {
   id: string;
   title: string;
   description: string | null;
   status: 'todo' | 'in_progress' | 'blocked' | 'done';
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  due_date: string | null;
   assigned_agent: string | null;
-  tags: string[] | null;
 }
 
-interface QuickAction {
+interface QuickActionData {
   id: string;
   name: string;
   description: string | null;
@@ -33,7 +51,6 @@ interface Content {
   body: string;
   platform: string | null;
   status: string;
-  scheduled_for: string | null;
 }
 
 interface Activity {
@@ -70,24 +87,6 @@ interface MemoryFile {
   preview: string;
   lastModified: string;
   isMainMemory?: boolean;
-  size?: number;
-}
-
-// Simple auth check
-const AUTH_COOKIE = 'mc_auth';
-const CORRECT_PASSWORD = 'brushworks2026'; // Change this or use env var
-
-function isAuthed(): boolean {
-  if (typeof window === 'undefined') return false;
-  return document.cookie.includes(`${AUTH_COOKIE}=1`);
-}
-
-function setAuth() {
-  document.cookie = `${AUTH_COOKIE}=1; path=/; max-age=${60 * 60 * 24 * 30}`; // 30 days
-}
-
-function clearAuth() {
-  document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0`;
 }
 
 export default function MissionControl() {
@@ -97,7 +96,7 @@ export default function MissionControl() {
   
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [actions, setActions] = useState<QuickAction[]>([]);
+  const [actions, setActions] = useState<QuickActionData[]>([]);
   const [content, setContent] = useState<Content[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [cronJobs, setCronJobs] = useState<CronJob[]>([]);
@@ -110,15 +109,12 @@ export default function MissionControl() {
   
   const supabase = createSupabaseBrowserClient();
 
-  // Check auth on mount
   useEffect(() => {
     setAuthed(isAuthed());
   }, []);
 
   useEffect(() => {
-    if (authed) {
-      loadDashboardData();
-    }
+    if (authed) loadDashboardData();
   }, [authed]);
 
   useEffect(() => {
@@ -139,23 +135,22 @@ export default function MissionControl() {
     }
   }
 
-  function handleLogout() {
-    clearAuth();
-    setAuthed(false);
-  }
-
   async function loadDashboardData() {
-    const [tasksRes, actionsRes, contentRes, activityRes] = await Promise.all([
+    const [tasksRes, actionsRes, contentRes, activityRes, cronRes, agentsRes] = await Promise.all([
       supabase.from('mc_tasks').select('*').eq('user_id', USER_ID).neq('status', 'done').order('created_at', { ascending: false }).limit(10),
       supabase.from('mc_actions').select('*').eq('user_id', USER_ID).order('sort_order'),
       supabase.from('mc_content').select('*').eq('user_id', USER_ID).neq('status', 'published').order('created_at', { ascending: false }).limit(5),
       supabase.from('mc_activity').select('*').eq('user_id', USER_ID).order('created_at', { ascending: false }).limit(10),
+      supabase.from('mc_cron_jobs').select('*').eq('user_id', USER_ID),
+      supabase.from('mc_agents').select('*').eq('user_id', USER_ID),
     ]);
 
     setTasks(tasksRes.data || []);
     setActions(actionsRes.data || []);
     setContent(contentRes.data || []);
     setActivity(activityRes.data || []);
+    setCronJobs(cronRes.data || []);
+    setAgents(agentsRes.data || []);
     setLoading(false);
   }
 
@@ -182,41 +177,17 @@ export default function MissionControl() {
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
     if (!newTask.trim()) return;
-
-    const { data: task } = await supabase
-      .from('mc_tasks')
-      .insert({ user_id: USER_ID, title: newTask })
-      .select()
-      .single();
-
+    const { data: task } = await supabase.from('mc_tasks').insert({ user_id: USER_ID, title: newTask }).select().single();
     if (task) {
       setTasks([task, ...tasks]);
       setNewTask('');
     }
   }
 
-  async function updateTaskStatus(taskId: string, status: string) {
-    await supabase.from('mc_tasks').update({ status, updated_at: new Date().toISOString() }).eq('id', taskId);
-    if (status === 'done') {
-      setTasks(tasks.filter(t => t.id !== taskId));
-    } else {
-      setTasks(tasks.map(t => t.id === taskId ? { ...t, status: status as Task['status'] } : t));
-    }
+  async function completeTask(taskId: string) {
+    await supabase.from('mc_tasks').update({ status: 'done' }).eq('id', taskId);
+    setTasks(tasks.filter(t => t.id !== taskId));
   }
-
-  const statusColors = {
-    todo: 'bg-gray-700',
-    in_progress: 'bg-blue-600',
-    blocked: 'bg-red-600',
-    done: 'bg-green-600',
-  };
-
-  const tabs: { id: TabType; label: string; icon: string }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: '🎛️' },
-    { id: 'calendar', label: 'Calendar', icon: '📅' },
-    { id: 'memory', label: 'Memory', icon: '🧠' },
-    { id: 'team', label: 'Team', icon: '👥' },
-  ];
 
   const filteredMemories = memories.filter(m => 
     memorySearch === '' || 
@@ -224,349 +195,384 @@ export default function MissionControl() {
     m.content.toLowerCase().includes(memorySearch.toLowerCase())
   );
 
-  // Auth loading state
+  const onlineAgents = agents.filter(a => a.status === 'online').length;
+  const activeJobs = cronJobs.filter(j => j.status === 'active').length;
+
+  // Auth loading
   if (authed === null) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-gray-400">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-[var(--text-muted)]">Loading...</div>
       </div>
     );
   }
 
-  // Login screen
+  // Login
   if (!authed) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-full max-w-sm">
-          <div className="text-center mb-6">
-            <div className="text-5xl mb-3">🎛️</div>
-            <h1 className="text-2xl font-bold text-white">Mission Control</h1>
-            <p className="text-gray-400 text-sm mt-1">Enter password to continue</p>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-[var(--accent-subtle)] rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
+              🎛️
+            </div>
+            <h1 className="text-xl font-semibold mb-1">Mission Control</h1>
+            <p className="text-meta">Enter password to continue</p>
           </div>
           <form onSubmit={handleLogin}>
-            <input
+            <Input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
               placeholder="Password"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 mb-4"
-              autoFocus
+              className="mb-4"
             />
-            {authError && <div className="text-red-400 text-sm mb-4">{authError}</div>}
-            <button
-              type="submit"
-              className="w-full bg-orange-600 hover:bg-orange-500 text-white font-medium py-3 rounded-lg transition-colors"
-            >
+            {authError && <p className="text-red-400 text-sm mb-4">{authError}</p>}
+            <Button type="submit" className="w-full">
               Enter
-            </button>
+            </Button>
           </form>
-        </div>
+        </Card>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-gray-400">Loading Mission Control...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-[var(--text-muted)]">Loading Mission Control...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🎛️</span>
-            <span className="text-2xl font-bold">Mission Control</span>
+    <div className="min-h-screen flex">
+      {/* Sidebar */}
+      <aside className="w-64 border-r border-[var(--border-subtle)] p-4 flex flex-col">
+        {/* Logo */}
+        <div className="flex items-center gap-3 px-3 py-4 mb-6">
+          <div className="w-9 h-9 bg-[var(--accent)] rounded-xl flex items-center justify-center text-lg">
+            🎛️
           </div>
-          <div className="flex items-center gap-6">
-            {/* Tab Navigation */}
-            <nav className="flex gap-1 bg-gray-900 rounded-lg p-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    activeTab === tab.id 
-                      ? 'bg-orange-600 text-white' 
-                      : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                  }`}
-                >
-                  <span className="mr-2">{tab.icon}</span>
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-            <span className="text-sm text-gray-400">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="text-gray-500 hover:text-gray-300 text-sm"
-            >
-              Logout
-            </button>
-          </div>
+          <span className="font-semibold text-lg">Mission Control</span>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Dashboard Tab */}
-        {activeTab === 'dashboard' && (
-          <>
-            {/* Quick Actions */}
-            <section className="mb-10">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Quick Actions</h2>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {actions.map((action) => (
-                  <button
-                    key={action.id}
-                    className="bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl p-4 text-left transition-colors"
-                    title={action.description || action.command}
-                  >
-                    <div className="text-2xl mb-2">{action.icon || '⚡'}</div>
-                    <div className="font-medium text-sm">{action.name}</div>
-                  </button>
-                ))}
+        {/* Nav */}
+        <nav className="flex-1 space-y-1">
+          <NavItem icon="📊" label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+          <NavItem icon="📅" label="Calendar" active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} />
+          <NavItem icon="🧠" label="Memory" active={activeTab === 'memory'} onClick={() => setActiveTab('memory')} />
+          <NavItem icon="👥" label="Team" active={activeTab === 'team'} onClick={() => setActiveTab('team')} />
+        </nav>
+
+        {/* User */}
+        <div className="pt-4 border-t border-[var(--border-subtle)]">
+          <button
+            onClick={() => { clearAuth(); setAuthed(false); }}
+            className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors"
+          >
+            <span className="text-lg">👤</span>
+            <span className="text-sm">Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto">
+        <div className="max-w-6xl mx-auto p-8">
+          {/* Dashboard */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-8">
+              {/* Header */}
+              <div>
+                <h1 className="text-title mb-1">Welcome back</h1>
+                <p className="text-body">
+                  {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                </p>
               </div>
-            </section>
 
-            <div className="grid lg:grid-cols-3 gap-8">
-              {/* Tasks */}
-              <section className="lg:col-span-2">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Tasks</h2>
-                  <span className="text-xs text-gray-500">{tasks.length} active</span>
-                </div>
-                
-                <form onSubmit={addTask} className="mb-4">
-                  <input
-                    type="text"
-                    value={newTask}
-                    onChange={(e) => setNewTask(e.target.value)}
-                    placeholder="Add a task..."
-                    className="w-full bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
-                  />
-                </form>
+              {/* Stats Row */}
+              <div className="grid grid-cols-4 gap-4">
+                <StatCard label="Agents Online" value={onlineAgents} subtitle={`${agents.length} total`} icon="🤖" />
+                <StatCard label="Scheduled Jobs" value={activeJobs} subtitle={`${cronJobs.length} configured`} icon="📅" />
+                <StatCard label="Tasks Active" value={tasks.length} subtitle="0 due today" icon="✓" />
+                <StatCard label="Content Drafts" value={content.length} subtitle="In pipeline" icon="📝" />
+              </div>
 
-                <div className="space-y-2">
-                  {tasks.length === 0 ? (
-                    <div className="text-gray-500 text-center py-8">No active tasks</div>
-                  ) : (
-                    tasks.map((task) => (
-                      <div key={task.id} className="bg-gray-900 border border-gray-800 rounded-lg p-4 flex items-center gap-4">
-                        <button
-                          onClick={() => updateTaskStatus(task.id, 'done')}
-                          className="w-5 h-5 rounded border-2 border-gray-600 hover:border-green-500 hover:bg-green-500/20 flex-shrink-0"
-                        />
-                        <div className="flex-grow min-w-0">
-                          <div className="font-medium truncate">{task.title}</div>
-                          {task.description && (
-                            <div className="text-sm text-gray-400 truncate">{task.description}</div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {task.assigned_agent && (
-                            <span className="text-xs bg-purple-900/50 text-purple-300 px-2 py-1 rounded">
-                              {task.assigned_agent}
-                            </span>
-                          )}
-                          <span className={`text-xs px-2 py-1 rounded ${statusColors[task.status]}`}>
-                            {task.status.replace('_', ' ')}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
-
-              {/* Sidebar */}
-              <aside className="space-y-8">
-                <section>
-                  <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Content Pipeline</h2>
-                  <div className="space-y-2">
-                    {content.length === 0 ? (
-                      <div className="text-gray-500 text-sm">No drafts</div>
-                    ) : (
-                      content.map((item) => (
-                        <div key={item.id} className="bg-gray-900 border border-gray-800 rounded-lg p-3">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs uppercase text-gray-500">{item.platform || 'draft'}</span>
-                            <span className="text-xs bg-gray-700 px-1.5 py-0.5 rounded">{item.status}</span>
-                          </div>
-                          <div className="text-sm truncate">{item.title || item.body.slice(0, 50)}</div>
-                        </div>
-                      ))
+              {/* Quick Actions + Today */}
+              <div className="grid grid-cols-3 gap-6">
+                <div className="col-span-2">
+                  <SectionHeader title="Quick Actions" />
+                  <div className="grid grid-cols-2 gap-3">
+                    {actions.slice(0, 6).map((action) => (
+                      <QuickAction 
+                        key={action.id}
+                        icon={action.icon || '⚡'} 
+                        title={action.name} 
+                        subtitle={action.description || undefined}
+                      />
+                    ))}
+                    {actions.length === 0 && (
+                      <Card className="col-span-2">
+                        <EmptyState icon="⚡" title="No quick actions" description="Add shortcuts to common commands" />
+                      </Card>
                     )}
                   </div>
-                </section>
+                </div>
 
-                <section>
-                  <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Recent Activity</h2>
-                  <div className="space-y-2">
+                <div>
+                  <SectionHeader title="Today's Focus" />
+                  <Card className="p-4 space-y-4">
+                    {cronJobs.slice(0, 3).map((job) => (
+                      <div key={job.id} className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{job.name}</div>
+                          <div className="text-meta">{job.next_run ? new Date(job.next_run).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Not scheduled'}</div>
+                        </div>
+                      </div>
+                    ))}
+                    {cronJobs.length === 0 && (
+                      <p className="text-meta text-center py-4">No scheduled jobs</p>
+                    )}
+                  </Card>
+                </div>
+              </div>
+
+              {/* Tasks + Activity */}
+              <div className="grid grid-cols-3 gap-6">
+                <div className="col-span-2">
+                  <SectionHeader title="Tasks" subtitle={`${tasks.length} active`} />
+                  <Card>
+                    <form onSubmit={addTask} className="p-4 border-b border-[var(--border-subtle)]">
+                      <Input 
+                        value={newTask} 
+                        onChange={setNewTask} 
+                        placeholder="Add a new task..." 
+                        icon={<span className="text-lg">+</span>}
+                      />
+                    </form>
+                    {tasks.length === 0 ? (
+                      <EmptyState icon="✓" title="All caught up" description="No active tasks right now" />
+                    ) : (
+                      <div>
+                        {tasks.map((task) => (
+                          <ListRow key={task.id}>
+                            <button
+                              onClick={() => completeTask(task.id)}
+                              className="w-5 h-5 rounded-md border-2 border-[var(--border-default)] hover:border-[var(--accent)] hover:bg-[var(--accent-subtle)] transition-colors flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">{task.title}</div>
+                              {task.description && <div className="text-meta truncate">{task.description}</div>}
+                            </div>
+                            {task.assigned_agent && (
+                              <Badge variant="accent">{task.assigned_agent}</Badge>
+                            )}
+                            <Badge variant={task.status === 'in_progress' ? 'accent' : task.status === 'blocked' ? 'error' : 'default'}>
+                              {task.status.replace('_', ' ')}
+                            </Badge>
+                          </ListRow>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
+                </div>
+
+                <div>
+                  <SectionHeader title="Activity Feed" />
+                  <Card className="p-4">
                     {activity.length === 0 ? (
-                      <div className="text-gray-500 text-sm">No recent activity</div>
+                      <p className="text-meta text-center py-8">No recent activity</p>
                     ) : (
-                      activity.map((item) => (
-                        <div key={item.id} className="text-sm text-gray-400">
-                          <span className="text-gray-500">
-                            {item.agent ? `🤖 ${item.agent}` : '👤 You'}
-                          </span>
-                          {' '}{item.summary || item.action}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </section>
-              </aside>
-            </div>
-          </>
-        )}
-
-        {/* Calendar Tab */}
-        {activeTab === 'calendar' && (
-          <section>
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-6">Scheduled Tasks & Cron Jobs</h2>
-            {cronJobs.length === 0 ? (
-              <div className="text-gray-500 text-center py-12 bg-gray-900 rounded-xl border border-gray-800">
-                <div className="text-4xl mb-4">📅</div>
-                <div>No scheduled jobs yet</div>
-                <div className="text-sm text-gray-600 mt-2">Cron jobs will appear here</div>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {cronJobs.map((job) => (
-                  <div key={job.id} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-lg">{job.name}</h3>
-                      <span className={`text-xs px-2 py-1 rounded ${job.status === 'active' ? 'bg-green-600' : 'bg-gray-700'}`}>
-                        {job.status}
-                      </span>
-                    </div>
-                    <p className="text-gray-400 text-sm mb-3">{job.description}</p>
-                    <div className="flex gap-6 text-xs text-gray-500">
-                      <div><span className="text-gray-600">Schedule:</span> {job.schedule}</div>
-                      {job.next_run && <div><span className="text-gray-600">Next:</span> {new Date(job.next_run).toLocaleString()}</div>}
-                      {job.last_run && <div><span className="text-gray-600">Last:</span> {new Date(job.last_run).toLocaleString()}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Memory Tab */}
-        {activeTab === 'memory' && (
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Memory Browser</h2>
-              <input
-                type="text"
-                value={memorySearch}
-                onChange={(e) => setMemorySearch(e.target.value)}
-                placeholder="Search memories..."
-                className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 w-64"
-              />
-            </div>
-            
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* Memory List */}
-              <div className="lg:col-span-1 space-y-2 max-h-[70vh] overflow-y-auto pr-2">
-                {filteredMemories.length === 0 ? (
-                  <div className="text-gray-500 text-center py-8">No memories found</div>
-                ) : (
-                  filteredMemories.map((mem) => (
-                    <button
-                      key={mem.filename}
-                      onClick={() => setSelectedMemory(mem)}
-                      className={`w-full text-left bg-gray-900 border rounded-lg p-3 transition-colors ${
-                        selectedMemory?.filename === mem.filename 
-                          ? 'border-orange-500' 
-                          : 'border-gray-800 hover:border-gray-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{mem.isMainMemory ? '📌' : '📝'}</span>
-                        <span className="font-medium text-sm">{mem.filename}</span>
-                        {mem.isMainMemory && (
-                          <span className="text-xs bg-orange-900/50 text-orange-300 px-1.5 py-0.5 rounded ml-auto">
-                            pinned
-                          </span>
-                        )}
+                      <div className="space-y-4">
+                        {activity.map((item) => (
+                          <div key={item.id} className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-[var(--bg-elevated)] flex items-center justify-center text-sm">
+                              {item.agent ? '🤖' : '👤'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm">{item.summary || item.action}</div>
+                              <div className="text-meta">{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="text-xs text-gray-500 mt-1 line-clamp-2">{mem.preview}</div>
-                      <div className="text-xs text-gray-600 mt-1">{mem.lastModified}</div>
-                    </button>
+                    )}
+                  </Card>
+                </div>
+              </div>
+
+              {/* Content Pipeline */}
+              <div>
+                <SectionHeader title="Content Pipeline" subtitle={`${content.length} drafts`} />
+                <Card>
+                  {content.length === 0 ? (
+                    <EmptyState icon="📝" title="No content in pipeline" description="Drafts and scheduled posts will appear here" />
+                  ) : (
+                    <div>
+                      {content.map((item) => (
+                        <ListRow key={item.id}>
+                          <div className="w-10 h-10 bg-[var(--bg-elevated)] rounded-lg flex items-center justify-center text-lg">
+                            {item.platform === 'twitter' ? '𝕏' : item.platform === 'linkedin' ? '💼' : '📝'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm">{item.title || item.body.slice(0, 50)}</div>
+                            <div className="text-meta">{item.platform || 'Draft'}</div>
+                          </div>
+                          <Badge>{item.status}</Badge>
+                        </ListRow>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Calendar */}
+          {activeTab === 'calendar' && (
+            <div className="space-y-8">
+              <div>
+                <h1 className="text-title mb-1">Calendar</h1>
+                <p className="text-body">Scheduled jobs and cron tasks</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <StatCard label="Active Jobs" value={activeJobs} icon="✓" variant="success" />
+                <StatCard label="Total Configured" value={cronJobs.length} icon="📅" />
+                <StatCard label="Next Run" value={cronJobs[0]?.next_run ? new Date(cronJobs[0].next_run).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'} icon="⏰" />
+              </div>
+
+              <Card>
+                {cronJobs.length === 0 ? (
+                  <EmptyState icon="📅" title="No scheduled jobs" description="Cron jobs will appear here when configured" />
+                ) : (
+                  <div>
+                    {cronJobs.map((job) => (
+                      <ListRow key={job.id}>
+                        <div className={`w-3 h-3 rounded-full ${job.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">{job.name}</div>
+                          <div className="text-meta">{job.description}</div>
+                        </div>
+                        <code className="text-xs bg-[var(--bg-elevated)] px-2 py-1 rounded font-mono">{job.schedule}</code>
+                        <div className="text-right">
+                          <div className="text-sm">{job.next_run ? new Date(job.next_run).toLocaleString() : '-'}</div>
+                          <div className="text-meta">Next run</div>
+                        </div>
+                        <Badge variant={job.status === 'active' ? 'success' : 'default'}>{job.status}</Badge>
+                      </ListRow>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </div>
+          )}
+
+          {/* Memory */}
+          {activeTab === 'memory' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-title mb-1">Memory</h1>
+                  <p className="text-body">Your knowledge base and daily notes</p>
+                </div>
+                <Input 
+                  value={memorySearch} 
+                  onChange={setMemorySearch} 
+                  placeholder="Search memories..."
+                  className="w-64"
+                  icon={<span>🔍</span>}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-6" style={{ height: 'calc(100vh - 220px)' }}>
+                <Card className="overflow-auto">
+                  <div className="p-4 border-b border-[var(--border-subtle)] sticky top-0 bg-[var(--bg-surface)]">
+                    <div className="text-section">{filteredMemories.length} files</div>
+                  </div>
+                  {filteredMemories.map((mem) => (
+                    <ListRow 
+                      key={mem.filename} 
+                      onClick={() => setSelectedMemory(mem)}
+                      className={selectedMemory?.filename === mem.filename ? 'bg-[var(--accent-subtle)]' : ''}
+                    >
+                      <span className="text-lg">{mem.isMainMemory ? '📌' : '📝'}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">{mem.filename}</div>
+                        <div className="text-meta truncate">{mem.preview}</div>
+                      </div>
+                      {mem.isMainMemory && <Badge variant="accent">pinned</Badge>}
+                    </ListRow>
+                  ))}
+                </Card>
+
+                <Card className="col-span-2 overflow-auto p-6">
+                  {selectedMemory ? (
+                    <>
+                      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[var(--border-subtle)]">
+                        <span className="text-2xl">{selectedMemory.isMainMemory ? '📌' : '📝'}</span>
+                        <div>
+                          <h2 className="font-semibold text-lg">{selectedMemory.filename}</h2>
+                          <div className="text-meta">{selectedMemory.lastModified}</div>
+                        </div>
+                      </div>
+                      <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed text-[var(--text-secondary)]">
+                        {selectedMemory.content}
+                      </pre>
+                    </>
+                  ) : (
+                    <EmptyState icon="🧠" title="Select a memory file" description="Choose a file from the list to view its contents" />
+                  )}
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Team */}
+          {activeTab === 'team' && (
+            <div className="space-y-8">
+              <div>
+                <h1 className="text-title mb-1">Team</h1>
+                <p className="text-body">Your AI agent roster</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <StatCard label="Agents Online" value={onlineAgents} subtitle={`of ${agents.length}`} icon="🤖" />
+                <StatCard label="Total Capabilities" value={agents.reduce((acc, a) => acc + (a.capabilities?.length || 0), 0)} icon="⚡" />
+                <StatCard label="Tasks Assigned" value={tasks.filter(t => t.assigned_agent).length} icon="📋" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                {agents.length === 0 ? (
+                  <Card className="col-span-2">
+                    <EmptyState icon="👥" title="No agents configured" description="Add your AI agents to the team" />
+                  </Card>
+                ) : (
+                  agents.map((agent) => (
+                    <Card key={agent.id} className="p-6">
+                      <div className="flex items-start gap-4 mb-4">
+                        <Avatar emoji={agent.avatar_emoji || '🤖'} size="lg" status={agent.status as 'online' | 'offline'} />
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg">{agent.name}</h3>
+                          <p className="text-body">{agent.role}</p>
+                        </div>
+                        <Badge variant={agent.status === 'online' ? 'success' : 'default'}>{agent.status}</Badge>
+                      </div>
+                      <p className="text-body mb-4">{agent.description}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {agent.capabilities?.map((cap) => (
+                          <Badge key={cap}>{cap}</Badge>
+                        ))}
+                      </div>
+                    </Card>
                   ))
                 )}
               </div>
-              
-              {/* Memory Content */}
-              <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-6 max-h-[70vh] overflow-y-auto">
-                {selectedMemory ? (
-                  <>
-                    <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-800">
-                      <span className="text-2xl">{selectedMemory.isMainMemory ? '📌' : '📝'}</span>
-                      <div>
-                        <h3 className="font-semibold text-lg text-orange-400">{selectedMemory.filename}</h3>
-                        <div className="text-xs text-gray-500">{selectedMemory.lastModified}</div>
-                      </div>
-                    </div>
-                    <pre className="whitespace-pre-wrap text-sm text-gray-300 font-mono leading-relaxed">
-                      {selectedMemory.content}
-                    </pre>
-                  </>
-                ) : (
-                  <div className="text-gray-500 text-center py-12">
-                    <div className="text-4xl mb-4">🧠</div>
-                    <div>Select a memory file to view</div>
-                  </div>
-                )}
-              </div>
             </div>
-          </section>
-        )}
-
-        {/* Team Tab */}
-        {activeTab === 'team' && (
-          <section>
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-6">Your AI Team</h2>
-            {agents.length === 0 ? (
-              <div className="text-gray-500 text-center py-12 bg-gray-900 rounded-xl border border-gray-800">
-                <div className="text-4xl mb-4">👥</div>
-                <div>No agents configured</div>
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {agents.map((agent) => (
-                  <div key={agent.id} className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="text-5xl">{agent.avatar_emoji || '🤖'}</div>
-                      <div>
-                        <h3 className="font-semibold text-lg">{agent.name}</h3>
-                        <p className="text-sm text-gray-400">{agent.role}</p>
-                      </div>
-                      <div className={`ml-auto w-3 h-3 rounded-full ${agent.status === 'online' ? 'bg-green-500' : 'bg-gray-600'}`} />
-                    </div>
-                    <p className="text-sm text-gray-400 mb-4">{agent.description}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {agent.capabilities?.map((cap) => (
-                        <span key={cap} className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded">
-                          {cap}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+          )}
+        </div>
       </main>
     </div>
   );
