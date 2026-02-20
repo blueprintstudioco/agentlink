@@ -127,27 +127,40 @@ export default function MissionControl() {
     }
   }, [chatMessages]);
 
-  // Realtime subscription for chat
+  // Realtime subscription for chat - always active when on chat tab
   useEffect(() => {
     if (activeTab !== 'chat') return;
     
+    console.log('Setting up realtime subscription for chat...');
+    
     const channel = supabase
-      .channel('mc_messages_realtime')
+      .channel(`mc_messages_${Date.now()}`) // unique channel name
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'mc_messages',
-        filter: `user_id=eq.${USER_ID}`
+        table: 'mc_messages'
       }, (payload) => {
+        console.log('Realtime message received:', payload);
         const newMsg = payload.new as ChatMessage;
+        if (newMsg.user_id !== USER_ID) return; // filter by user
+        
         // For team chat, show all messages. For individual agents, filter.
         if (chatAgent === 'team' || newMsg.to_agent === chatAgent || newMsg.from_agent === chatAgent) {
-          setChatMessages(prev => [...prev, newMsg]);
+          setChatMessages(prev => {
+            // Avoid duplicates
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+      });
     
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      console.log('Cleaning up realtime subscription');
+      supabase.removeChannel(channel); 
+    };
   }, [activeTab, chatAgent]);
 
   async function handleLogout() {
