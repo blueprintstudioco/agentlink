@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase';
-import CronVisualizer from '@/components/CronVisualizer';
 
 // Alex's hardcoded user ID - single user app
 const USER_ID = '9452a23f-a139-42cd-83e4-732f188a07ff';
@@ -70,111 +69,32 @@ interface MemoryFile {
   content: string;
   preview: string;
   lastModified: string;
-  size?: number;
   isMainMemory?: boolean;
+  size?: number;
 }
 
-// Simple markdown renderer component
-function MarkdownContent({ content }: { content: string }) {
-  const renderLine = (line: string, key: number) => {
-    // Headers
-    if (line.startsWith('#### ')) return <h4 key={key} className="text-base font-semibold text-gray-300 mt-3 mb-1">{renderInline(line.slice(5))}</h4>;
-    if (line.startsWith('### ')) return <h3 key={key} className="text-lg font-semibold text-gray-200 mt-4 mb-2">{renderInline(line.slice(4))}</h3>;
-    if (line.startsWith('## ')) return <h2 key={key} className="text-xl font-semibold text-white mt-5 mb-2">{renderInline(line.slice(3))}</h2>;
-    if (line.startsWith('# ')) return <h1 key={key} className="text-2xl font-bold text-white mt-6 mb-3">{renderInline(line.slice(2))}</h1>;
-    
-    // Horizontal rule
-    if (line.match(/^---+$/)) return <hr key={key} className="border-gray-700 my-4" />;
-    
-    // Bullet points
-    if (line.match(/^[-*] /)) return <li key={key} className="text-gray-300 ml-4 list-disc">{renderInline(line.slice(2))}</li>;
-    
-    // Numbered lists
-    if (line.match(/^\d+\. /)) return <li key={key} className="text-gray-300 ml-4 list-decimal">{renderInline(line.replace(/^\d+\. /, ''))}</li>;
-    
-    // Blockquote
-    if (line.startsWith('> ')) return <blockquote key={key} className="border-l-4 border-gray-600 pl-4 text-gray-400 italic my-2">{renderInline(line.slice(2))}</blockquote>;
-    
-    // Code block markers (skip them)
-    if (line.startsWith('```')) return null;
-    
-    // Table row
-    if (line.startsWith('|') && line.endsWith('|')) {
-      const cells = line.slice(1, -1).split('|').map(c => c.trim());
-      if (cells.every(c => c.match(/^-+$/))) return null; // Skip separator
-      return (
-        <tr key={key} className="border-b border-gray-800">
-          {cells.map((cell, i) => <td key={i} className="px-3 py-2 text-sm text-gray-300">{renderInline(cell)}</td>)}
-        </tr>
-      );
-    }
-    
-    // Empty line
-    if (!line.trim()) return <div key={key} className="h-2" />;
-    
-    // Regular paragraph
-    return <p key={key} className="text-gray-300 my-1">{renderInline(line)}</p>;
-  };
+// Simple auth check
+const AUTH_COOKIE = 'mc_auth';
+const CORRECT_PASSWORD = 'brushworks2026'; // Change this or use env var
 
-  const renderInline = (text: string) => {
-    // Process inline formatting
-    let html = text
-      .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
-      .replace(/`([^`]+)`/g, '<code class="bg-gray-800 px-1.5 py-0.5 rounded text-orange-400 text-sm font-mono">$1</code>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-400 hover:underline" target="_blank" rel="noopener">$1</a>');
-    
-    return <span dangerouslySetInnerHTML={{ __html: html }} />;
-  };
+function isAuthed(): boolean {
+  if (typeof window === 'undefined') return false;
+  return document.cookie.includes(`${AUTH_COOKIE}=1`);
+}
 
-  const lines = content.split('\n');
-  let inTable = false;
-  const elements: React.ReactNode[] = [];
-  let tableRows: React.ReactNode[] = [];
+function setAuth() {
+  document.cookie = `${AUTH_COOKIE}=1; path=/; max-age=${60 * 60 * 24 * 30}`; // 30 days
+}
 
-  lines.forEach((line, i) => {
-    const isTableRow = line.startsWith('|') && line.endsWith('|');
-    
-    if (isTableRow && !inTable) {
-      inTable = true;
-      tableRows = [];
-    }
-    
-    if (inTable && isTableRow) {
-      const row = renderLine(line, i);
-      if (row) tableRows.push(row);
-    } else if (inTable && !isTableRow) {
-      // End table
-      if (tableRows.length > 0) {
-        elements.push(
-          <table key={`table-${i}`} className="w-full my-4 border border-gray-800 rounded">
-            <tbody>{tableRows}</tbody>
-          </table>
-        );
-      }
-      inTable = false;
-      tableRows = [];
-      const el = renderLine(line, i);
-      if (el) elements.push(el);
-    } else {
-      const el = renderLine(line, i);
-      if (el) elements.push(el);
-    }
-  });
-
-  // Close any remaining table
-  if (tableRows.length > 0) {
-    elements.push(
-      <table key="table-end" className="w-full my-4 border border-gray-800 rounded">
-        <tbody>{tableRows}</tbody>
-      </table>
-    );
-  }
-
-  return <div>{elements}</div>;
+function clearAuth() {
+  document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0`;
 }
 
 export default function MissionControl() {
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [actions, setActions] = useState<QuickAction[]>([]);
@@ -190,15 +110,39 @@ export default function MissionControl() {
   
   const supabase = createSupabaseBrowserClient();
 
+  // Check auth on mount
   useEffect(() => {
-    loadDashboardData();
+    setAuthed(isAuthed());
   }, []);
 
   useEffect(() => {
+    if (authed) {
+      loadDashboardData();
+    }
+  }, [authed]);
+
+  useEffect(() => {
+    if (!authed) return;
     if (activeTab === 'calendar') loadCronJobs();
     if (activeTab === 'team') loadAgents();
     if (activeTab === 'memory') loadMemories();
-  }, [activeTab]);
+  }, [activeTab, authed]);
+
+  function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (password === CORRECT_PASSWORD) {
+      setAuth();
+      setAuthed(true);
+      setAuthError('');
+    } else {
+      setAuthError('Wrong password');
+    }
+  }
+
+  function handleLogout() {
+    clearAuth();
+    setAuthed(false);
+  }
 
   async function loadDashboardData() {
     const [tasksRes, actionsRes, contentRes, activityRes] = await Promise.all([
@@ -280,6 +224,47 @@ export default function MissionControl() {
     m.content.toLowerCase().includes(memorySearch.toLowerCase())
   );
 
+  // Auth loading state
+  if (authed === null) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-gray-400">Loading...</div>
+      </div>
+    );
+  }
+
+  // Login screen
+  if (!authed) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-full max-w-sm">
+          <div className="text-center mb-6">
+            <div className="text-5xl mb-3">🎛️</div>
+            <h1 className="text-2xl font-bold text-white">Mission Control</h1>
+            <p className="text-gray-400 text-sm mt-1">Enter password to continue</p>
+          </div>
+          <form onSubmit={handleLogin}>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 mb-4"
+              autoFocus
+            />
+            {authError && <div className="text-red-400 text-sm mb-4">{authError}</div>}
+            <button
+              type="submit"
+              className="w-full bg-orange-600 hover:bg-orange-500 text-white font-medium py-3 rounded-lg transition-colors"
+            >
+              Enter
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -318,6 +303,12 @@ export default function MissionControl() {
             <span className="text-sm text-gray-400">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
             </span>
+            <button
+              onClick={handleLogout}
+              className="text-gray-500 hover:text-gray-300 text-sm"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </header>
@@ -438,7 +429,35 @@ export default function MissionControl() {
 
         {/* Calendar Tab */}
         {activeTab === 'calendar' && (
-          <CronVisualizer />
+          <section>
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-6">Scheduled Tasks & Cron Jobs</h2>
+            {cronJobs.length === 0 ? (
+              <div className="text-gray-500 text-center py-12 bg-gray-900 rounded-xl border border-gray-800">
+                <div className="text-4xl mb-4">📅</div>
+                <div>No scheduled jobs yet</div>
+                <div className="text-sm text-gray-600 mt-2">Cron jobs will appear here</div>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {cronJobs.map((job) => (
+                  <div key={job.id} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-lg">{job.name}</h3>
+                      <span className={`text-xs px-2 py-1 rounded ${job.status === 'active' ? 'bg-green-600' : 'bg-gray-700'}`}>
+                        {job.status}
+                      </span>
+                    </div>
+                    <p className="text-gray-400 text-sm mb-3">{job.description}</p>
+                    <div className="flex gap-6 text-xs text-gray-500">
+                      <div><span className="text-gray-600">Schedule:</span> {job.schedule}</div>
+                      {job.next_run && <div><span className="text-gray-600">Next:</span> {new Date(job.next_run).toLocaleString()}</div>}
+                      {job.last_run && <div><span className="text-gray-600">Last:</span> {new Date(job.last_run).toLocaleString()}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         )}
 
         {/* Memory Tab */}
@@ -481,9 +500,7 @@ export default function MissionControl() {
                         )}
                       </div>
                       <div className="text-xs text-gray-500 mt-1 line-clamp-2">{mem.preview}</div>
-                      <div className="text-xs text-gray-600 mt-1">
-                        {new Date(mem.lastModified).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </div>
+                      <div className="text-xs text-gray-600 mt-1">{mem.lastModified}</div>
                     </button>
                   ))
                 )}
@@ -497,22 +514,12 @@ export default function MissionControl() {
                       <span className="text-2xl">{selectedMemory.isMainMemory ? '📌' : '📝'}</span>
                       <div>
                         <h3 className="font-semibold text-lg text-orange-400">{selectedMemory.filename}</h3>
-                        <div className="text-xs text-gray-500">
-                          {new Date(selectedMemory.lastModified).toLocaleDateString('en-US', { 
-                            weekday: 'long', 
-                            month: 'short', 
-                            day: 'numeric', 
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                          {selectedMemory.size && ` • ${(selectedMemory.size / 1024).toFixed(1)} KB`}
-                        </div>
+                        <div className="text-xs text-gray-500">{selectedMemory.lastModified}</div>
                       </div>
                     </div>
-                    <div className="prose prose-invert prose-sm max-w-none">
-                      <MarkdownContent content={selectedMemory.content} />
-                    </div>
+                    <pre className="whitespace-pre-wrap text-sm text-gray-300 font-mono leading-relaxed">
+                      {selectedMemory.content}
+                    </pre>
                   </>
                 ) : (
                   <div className="text-gray-500 text-center py-12">
